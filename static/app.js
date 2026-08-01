@@ -17,6 +17,8 @@ let nodes = [];
 let elements = []; 
 let nextNodeId = 0;
 let mode = "node";
+let materials = {};
+let currentMaterial = "steel";
 let selectedNodeIds = [];
 let showStress = false;
 let showDeformed = false;
@@ -28,6 +30,8 @@ let edgeRules = [];
 let scale = 1;
 let deformationScale = 50;
 let stressScaleMode = "linear";
+let materials = {};
+let currentMaterial = "steel";
 
 function updateModeButtons() {
     const nodeButton = document.getElementById("mode-node");
@@ -70,6 +74,35 @@ if (rectangleButton) {
     rectangleButton.onclick = () => setMode("rectangle")
 }
 updateModeButtons();
+
+async function loadMaterials() {
+    try {
+        const response = await fetch("/materials");
+        materials = await response.json();
+    } catch (err) {
+        console.error("Failed to load materials, falling back to steel only:", err);
+        materials = { steel: { E: 200e9, nu: 0.30 } };
+    }
+    const select = document.getElementById("material-select");
+    if (!select) return;
+    select.innerHTML = "";
+    for (const name of Object.keys(materials)) {
+        const opt = document.createElement("option");
+        opt.value = name;
+        opt.textContent = name.charAt(0).toUpperCase() + name.slice(1);
+        select.appendChild(opt);
+    }
+    select.value = currentMaterial;
+}
+
+const materialSelect = document.getElementById("material-select");
+if (materialSelect) {
+    materialSelect.onchange = () => {
+        currentMaterial = materialSelect.value;
+    };
+}
+
+loadMaterials();
 
 function resizeCanvas() {
     const availableWidth = window.innerWidth;
@@ -592,7 +625,7 @@ canvas.addEventListener("click", (e) => {
         }
 
         if (selectedNodeIds.length === 3) {
-            elements.push({ type: "triangle", node_ids: [...selectedNodeIds] });
+            elements.push({ type: "triangle", node_ids: [...selectedNodeIds], material: currentMaterial });
             selectedNodeIds = [];
         }
     } else if (mode == "rectangle") {
@@ -611,10 +644,8 @@ canvas.addEventListener("click", (e) => {
             let node_b = nodes.find(n => n.id === selectedNodeIds[1]);
             let node_c = findOrCreateNode(node_a.x, node_b.y);
             let node_d = findOrCreateNode(node_b.x, node_a.y)
-            elements.push({ type: "triangle", node_ids: [node_a.id,node_c.id,node_d.id]
-            })
-            elements.push({ type: "triangle", node_ids: [node_b.id,node_c.id,node_d.id]
-            });
+            elements.push({ type: "triangle", node_ids: [node_a.id,node_c.id,node_d.id], material: currentMaterial})
+            elements.push({ type: "triangle", node_ids: [node_b.id,node_c.id,node_d.id], material: currentMaterial});
             selectedNodeIds = []
         }
     }
@@ -954,13 +985,8 @@ document.getElementById("edge-panel-apply").onclick = () => {
         rule.fix_x = document.getElementById("edge-fixx").checked;
         rule.fix_y = document.getElementById("edge-fixy").checked;
     } else {
-        if (type === "fix") {
-            rule.fix_x = document.getElementById("edge-fixx").checked;
-            rule.fix_y = document.getElementById("edge-fixy").checked;
-        } else {
-            rule.force_x = parseFloat(document.getElementById("edge-fx").value) || 0;
-            rule.force_y = -parseFloat(document.getElementById("edge-fy").value) || 0;
-        }
+        rule.force_x = parseFloat(document.getElementById("edge-fx").value) || 0;
+        rule.force_y = -parseFloat(document.getElementById("edge-fy").value) || 0;
     }
 
     edgeRules = edgeRules.filter(r =>
@@ -1019,8 +1045,7 @@ document.getElementById("calculate-btn").onclick = async () => {
                 is_fixed_x: n.is_fixed_x, is_fixed_y: n.is_fixed_y
             })),
             elements: elements.map(el => ({
-                type: el.type, node_ids: el.node_ids
-            })),
+            type: el.type, node_ids: el.node_ids, material: el.material || "steel"})),
             refine_times: refineTimes,
             edge_rules: edgeRules
         };

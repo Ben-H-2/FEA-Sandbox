@@ -43,7 +43,7 @@ def reduce_system(K, F, nodes, node_index):
         if node.is_fixed_y: remove.append(idx*2+1)
     remove_set = set(remove)
     keep = [dof for dof in range(n) if dof not in remove_set]
-    K_r = K.tocsr()[keep, :][:, keep]
+    K_r = K.tocsr()[keep, :].tocsc()[:, keep]
     F_r = F[keep]
     return K_r, F_r, remove_set
 

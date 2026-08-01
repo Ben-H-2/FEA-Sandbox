@@ -15,6 +15,7 @@ from pydantic import BaseModel, Field
 from fea.mesh import refine_mesh, apply_edge_rules
 from fea.model import AnalysisModel
 from fea.element import Element, TriangleElement
+from fea.material import DEFAULT_MATERIALS
 
 app = FastAPI()
 
@@ -59,6 +60,10 @@ def root():
     if index_file.exists():
         return FileResponse(index_file)
     return {"message": "Frontend not found"}
+
+@app.get("/materials")
+def get_materials():
+    return {name: {"E": E, "nu": nu} for name, (E, nu) in DEFAULT_MATERIALS.items()}
 
 @app.post("/calculate")
 def calculate(req: CalculateRequest):

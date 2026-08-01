@@ -4,9 +4,8 @@ import numpy as np
 
 from fea.node import Node
 from fea.element import Element,TriangleElement,ElementBase
-from fea.material import Material
+from fea.material import Material,DEFAULT_MATERIALS
 from fea.solver import build_node_index, create_global_matrix, build_force_vector,reduce_system,expand_displacements,solve_system
-from fea.visualisation import render_mesh, show_mesh,render_model
 
 class AnalysisModel:
     def __init__(self):
@@ -40,15 +39,7 @@ class AnalysisModel:
         return element
     
     def _add_default_materials(self):
-        defaults = {
-            "steel":     (200e9, 0.30),
-            "aluminium": (69e9,  0.33),
-            "copper":    (110e9, 0.34),
-            "titanium":  (114e9, 0.32),
-            "concrete":  (30e9,  0.20),
-            "timber":    (11e9,  0.30),
-        }
-        for name, (E, nu) in defaults.items():
+        for name, (E, nu) in DEFAULT_MATERIALS.items():
             self.add_material(name, E=E, nu=nu)
         
     def add_material(self, name, E, nu):
@@ -218,5 +209,6 @@ class AnalysisModel:
         pass
 
     def plot_results(self, scale=1):
+        from fea.visualisation import show_mesh, render_model
         mesh = render_model(self, deformed=(self.u is not None), scale=scale)
         show_mesh(mesh, show_edges=True)
