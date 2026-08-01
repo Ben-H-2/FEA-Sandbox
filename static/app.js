@@ -30,8 +30,6 @@ let edgeRules = [];
 let scale = 1;
 let deformationScale = 50;
 let stressScaleMode = "linear";
-let materials = {};
-let currentMaterial = "steel";
 
 function updateModeButtons() {
     const nodeButton = document.getElementById("mode-node");
