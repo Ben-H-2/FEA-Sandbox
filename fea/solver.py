@@ -45,7 +45,7 @@ def reduce_system(K, F, nodes, node_index):
     keep = [dof for dof in range(n) if dof not in remove_set]
     K_r = K.tocsr()[keep, :][:, keep]
     F_r = F[keep]
-    return K_r, F_r, remove
+    return K_r, F_r, remove_set
 
 def solve_system(K_reduced, F_reduced):
     return spsolve(K_reduced, F_reduced)

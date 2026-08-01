@@ -12,6 +12,8 @@ class AnalysisModel:
     def __init__(self):
         self.elements: list[ElementBase] = []
         self.nodes: list[Node] = []
+        self._node_set: set[Node]= set()
+        self._element_set: set[Element]= set()
         self.materials: dict[str, Material] = {}
         self._next_id = 0
         self.u: Optional[np.ndarray] = None
@@ -24,15 +26,17 @@ class AnalysisModel:
         new_node = Node(identifier=self._next_id,posx = posx,posy = posy)
         self._next_id += 1
         self.nodes.append(new_node)
+        self._node_set.add(new_node)
         return new_node
 
     def add_element(self, element: ElementBase):
         if not isinstance(element, ElementBase):
             raise TypeError(f"{type(element).__name__} is not a valid element type.")
         for node in element.get_nodes():
-            if node not in self.nodes:
+            if node not in self._node_set:
                 raise ValueError(f"Element references a node not in this model: {node}")
         self.elements.append(element)
+        self._element_set.add(element)
         return element
     
     def _add_default_materials(self):
@@ -90,18 +94,20 @@ class AnalysisModel:
         return node
         
     def remove_node(self, node):
-        if node not in self.nodes:
+        if node not in self._node_set:
             raise ValueError(f"Node is not part of this model: {node}")
         for element in self.elements:
             if node in element.get_nodes():
                 raise ValueError(f"Cannot remove node: still referenced by an element: {element}")
         self.nodes.remove(node)
+        self._node_set.discard(node)
         return node
 
     def remove_element(self, element):
-        if element not in self.elements:
+        if element not in self._element_set:
             raise ValueError(f"Element is not part of this model: {element}")
         self.elements.remove(element)
+        self._element_set.discard(element)
         return element
 
     def clear_all(self):

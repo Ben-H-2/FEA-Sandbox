@@ -34,7 +34,7 @@ class NodeIn(BaseModel):
     force_x: float = 0.0
     force_y: float = 0.0
     is_fixed_x: bool = False
-    is_fixed_y: bool = True
+    is_fixed_y: bool = False
 
 class ElementIn(BaseModel):
     type: str
