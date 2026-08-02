@@ -1,210 +1,478 @@
 <!DOCTYPE html>
 <html>
-<head>
-  <title>FEA Editor</title>
-  <style>
-    body { margin: 0; font-family: sans-serif; display: flex; flex-direction: column; height: 100vh; }
-    #toolbar { padding: 8px; background: #222; color: white; }
-    #toolbar button.active { background: #4a9; }
-    #refine-input.refine-warning {
-      color: red;
-      font-weight: bold;
-      outline: 1px solid red;
-    }
-    #add-node-x::-webkit-outer-spin-button,
-    #add-node-x::-webkit-inner-spin-button,
-    #add-node-y::-webkit-outer-spin-button,
-    #add-node-y::-webkit-inner-spin-button {
-      -webkit-appearance: none;
-      margin: 0;
-    }
-    #add-node-x,
-    #add-node-y {
-      -moz-appearance: textfield;
-    }
-    canvas { background: #fafafa; display: block; flex: 1; }
-    .slider-control {
-      width: 100%;
-      box-sizing: border-box;
-      padding: 8px;
-      background: #222;
-      color: white;
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      align-items: center;
-    }
-    .slider-label {
-      display: flex;
-      gap: 8px;
-      align-items: center;
-      flex: 0 0 auto;
-      min-width: 220px;
-    }
-    .slider-control input[type="range"] {
-      flex: 1 1 100%;
-      min-width: 220px;
-      width: 100%;
-      margin: 0;
-      box-sizing: border-box;
-    }
-    .range-bounds {
-      display: flex;
-      gap: 8px;
-      align-items: center;
-      flex: 0 0 auto;
-      }
-    .range-bounds input {
-      width: 64px;
-      box-sizing: border-box;
-    }
-    .modal-overlay {
-      position: fixed;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background: rgba(0, 0, 0, 0.5);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 1000;
-    }
-    .modal-box {
-        background: white;
-        padding: 24px;
-        border-radius: 8px;
-        max-width: 360px;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.3);
-    }
-    .modal-checkbox {
-        display: block;
-        margin: 16px 0;
-        font-size: 0.9em;
-    }
-    .modal-buttons {
+  <head>
+    <title>FEA Editor</title>
+    <style>
+      body {
+        margin: 0;
+        font-family: sans-serif;
         display: flex;
-        justify-content: flex-end;
+        flex-direction: column;
+        height: 100vh;
+      }
+
+      :root {
+        --tb-bg: #1a1c1f;
+        --tb-raised: #24272b;
+        --tb-border: #33373c;
+        --tb-text: #e8e9eb;
+        --tb-text-dim: #9a9fa6;
+        --tb-accent: #44aa99;
+        --tb-accent-soft: rgba(68, 170, 153, 0.18);
+        --tb-danger: #d9534f;
+        --tb-danger-soft: rgba(217, 83, 79, 0.18);
+      }
+
+      #toolbar {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
         gap: 10px;
-    }
-    .modal-buttons button {
-        padding: 6px 16px;
-    }
-    #warning-proceed-btn {
-        background: #d9534f;
-        color: white;
+        padding: 6px 10px;
+        background: var(--tb-bg);
+        border-bottom: 1px solid var(--tb-border);
+      }
+
+      .toolbar-group {
+        display: flex;
+        align-items: center;
+        gap: 2px;
+        padding-left: 10px;
+        border-left: 1px solid var(--tb-border);
+      }
+
+      .toolbar-group:first-child {
+        padding-left: 0;
+        border-left: none;
+      }
+
+      .toolbar-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 36px;
+        height: 36px;
+        padding: 0;
+        background: transparent;
+        border: 1px solid transparent;
+        border-radius: 6px;
+        color: var(--tb-text-dim);
+        cursor: pointer;
+        position: relative;
+      }
+
+      .toolbar-btn svg {
+        width: 18px;
+        height: 18px;
+        stroke: currentColor;
+      }
+
+      .toolbar-btn:hover {
+        background: var(--tb-raised);
+        color: var(--tb-text);
+      }
+
+      .toolbar-btn.active {
+        background: var(--tb-accent-soft);
+        border-color: var(--tb-accent);
+        color: var(--tb-accent);
+      }
+
+      .toolbar-btn.danger:hover {
+        background: var(--tb-danger-soft);
+        color: var(--tb-danger);
+      }
+
+      .toolbar-btn:focus-visible {
+        outline: 2px solid var(--tb-accent);
+        outline-offset: 2px;
+      }
+
+      .btn-badge {
+        position: absolute;
+        bottom: 2px;
+        right: 2px;
+        font-size: 8px;
+        font-weight: 600;
+        line-height: 1;
+        color: var(--tb-text-dim);
+      }
+
+      .toolbar-btn.active .btn-badge {
+        color: var(--tb-accent);
+      }
+
+      .toolbar-control {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        height: 36px;
+        padding: 0 8px;
+        background: var(--tb-raised);
+        border: 1px solid var(--tb-border);
+        border-radius: 6px;
+        color: var(--tb-text-dim);
+      }
+
+      .toolbar-control svg {
+        width: 16px;
+        height: 16px;
+        stroke: currentColor;
+        flex-shrink: 0;
+      }
+
+      .toolbar-control select,
+      .toolbar-control input {
+        background: transparent;
         border: none;
-        border-radius: 4px;
-    }
-    #warning-cancel-btn {
-        background: #eee;
-        border: 1px solid #ccc;
-        border-radius: 4px;
-    }
-    .spinner {
+        color: var(--tb-text);
+        font-size: 13px;
+        outline: none;
+      }
+
+      .toolbar-control input[type="number"] {
+        width: 34px;
+      }
+
+      .toolbar-control.coord-x input,
+      .toolbar-control.coord-y input {
+        width: 44px;
+      }
+
+      [data-tooltip] {
+        position: relative;
+      }
+
+      .scale-bar {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        width: 100%;
+        box-sizing: border-box;
+        padding: 6px 12px;
+        background: var(--tb-bg);
+        border-bottom: 1px solid var(--tb-border);
+        color: var(--tb-text);
+      }
+
+      .scale-bar-label {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex: 0 0 auto;
+        font-size: 13px;
+        color: var(--tb-text-dim);
+        white-space: nowrap;
+      }
+
+      .scale-bar-label svg {
+        width: 16px;
+        height: 16px;
+        stroke: var(--tb-accent);
+        flex-shrink: 0;
+      }
+
+      .scale-bound {
+        flex: 0 0 auto;
+        width: 56px;
+        height: 28px;
+        background: var(--tb-raised);
+        border: 1px solid var(--tb-border);
+        border-radius: 6px;
+        color: var(--tb-text);
+        font-size: 12px;
+        text-align: center;
+        padding: 0 4px;
+      }
+
+      .scale-bound::-webkit-outer-spin-button,
+      .scale-bound::-webkit-inner-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+      }
+
+      .scale-bound {
+        -moz-appearance: textfield;
+      }
+
+      .scale-bound:focus-visible {
+        outline: 2px solid var(--tb-accent);
+        outline-offset: 1px;
+      }
+
+      .scale-track-wrap {
+        flex: 1 1 auto;
+        min-width: 120px;
+        display: flex;
+        align-items: center;
+      }
+
+      .scale-bar input[type="range"] {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 100%;
+        height: 4px;
+        border-radius: 999px;
+        background: linear-gradient(
+          to right,
+          var(--tb-accent) 0%,
+          var(--tb-accent) var(--fill, 0%),
+          var(--tb-border) var(--fill, 0%),
+          var(--tb-border) 100%
+        );
+        margin: 0;
+        cursor: pointer;
+      }
+
+      .scale-bar input[type="range"]::-webkit-slider-thumb {
+        -webkit-appearance: none;
         width: 14px;
         height: 14px;
-        border: 2px solid #555;
-        border-top: 2px solid white;
         border-radius: 50%;
-        animation: spin 0.8s linear infinite;
-    }
-    @keyframes spin {
-        to { transform: rotate(360deg); }
-    }
-  </style>
-</head>
-<body>
-  <div id="toolbar">
-    <button id="mode-node">Place Node</button>
-    <button id="mode-triangle">Make Triangle</button>
-    <button id="mode-rectangle">Make Rectangle</button>
-    <label>Material: <select id="material-select"></select></label>
-    <label>Refine: <input id="refine-input" type="number" value="1" min="0" max="8"></label>
-    <button id="calculate-btn">Calculate</button>
-    <button id="toggle-stress-btn">Toggle Stress</button>
-    <button id="toggle-scale-btn">Scale: Linear</button>
-    <button id="toggle-outlines-btn">Toggle Outlines</button>
-    <button id="toggle-deformed-btn">Toggle Deformation</button>
-    <button id="clear-mesh-btn">Clear Mesh</button>
-    <span style="margin-left:16px;">
-      X: <input id="add-node-x" type="number" step="any" style="width:30px;">
-      Y: <input id="add-node-y" type="number" step="any" style="width:30px;">
-      <button id="add-node-btn">Add Node</button>
-    </span>
-  </div>
-  <div id="mouse-coords" style="position:fixed; left:16px; bottom:16px; background:#222; color:white; padding:6px 10px; border-radius:6px; font-size:0.8em; font-family:sans-serif; z-index:998;">
-    X: —, Y: —
-  </div>
-  <div id="stress-tooltip" style="display:none; position:fixed; background:#222; color:white; padding:6px 10px; border-radius:6px; font-size:0.8em; font-family:sans-serif; z-index:999; pointer-events:none;">
-  </div>
-  <div id="solve-status" style="display:none; position: fixed; bottom: 16px; right: 16px; background: #222; color: white; padding: 10px 14px; border-radius: 6px; font-size: 0.85em; align-items: center; gap: 8px; z-index: 999;">
-    <div class="spinner"></div>
-    <span id="solve-status-text">Solving...</span>
-  </div>
-  </div>
-  <div id="node-panel" style="display:none; position:absolute; background:#333; color:white; padding:10px; border-radius:4px;">
-    <strong>Edit Node</strong>
-    <span id="node-panel-coords" style="float:right; color:#999; font-size:0.75em; margin-left:12px;"></span>
-    <br>
-    <label>Force X: <input id="node-fx" type="number" value="0"></label><br>
-    <label>Force Y: <input id="node-fy" type="number" value="0"></label><br>
-    <label>Fix X: <input id="node-fixx" type="checkbox"></label>
-    <label>Fix Y: <input id="node-fixy" type="checkbox"></label><br>
-    <button id="node-panel-apply">Apply</button>
-    <button id="node-panel-cancel">Cancel</button>
-    <button id="node-panel-delete" style="background:#a33; color:white; border:none; border-radius:3px;">Delete</button>
-  </div>
-  <div id="edge-panel" style="display:none; position:absolute; background:#333; color:white; padding:10px; border-radius:4px;">
-    <strong>Edit Edge</strong><br>
-    <label>Type:
-        <select id="edge-type">
-            <option value="fix">Fix</option>
-            <option value="force">Force</option>
-        </select>
-    </label>
+        background: var(--tb-accent);
+        border: 2px solid var(--tb-bg);
+        box-shadow: 0 0 0 1px var(--tb-accent);
+        cursor: pointer;
+        transition: transform 0.12s ease;
+      }
 
-    <div id="edge-fix-fields">
+      .scale-bar input[type="range"]::-webkit-slider-thumb:hover {
+        transform: scale(1.15);
+      }
+
+      .scale-bar input[type="range"]::-moz-range-thumb {
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        background: var(--tb-accent);
+        border: 2px solid var(--tb-bg);
+        box-shadow: 0 0 0 1px var(--tb-accent);
+        cursor: pointer;
+      }
+
+      .scale-bar input[type="range"]::-moz-range-track {
+        height: 4px;
+        border-radius: 999px;
+        background: var(--tb-border);
+      }
+
+      .scale-bar input[type="range"]::-moz-range-progress {
+        height: 4px;
+        border-radius: 999px;
+        background: var(--tb-accent);
+      }
+
+      .scale-bar input[type="range"]:focus-visible {
+        outline: 2px solid var(--tb-accent);
+        outline-offset: 3px;
+      }
+
+      .scale-value {
+        flex: 0 0 auto;
+        min-width: 48px;
+        height: 28px;
+        padding: 0 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--tb-accent-soft);
+        border: 1px solid var(--tb-accent);
+        border-radius: 6px;
+        color: var(--tb-accent);
+        font-family: ui-monospace, monospace;
+        font-variant-numeric: tabular-nums;
+        font-size: 12px;
+        font-weight: 600;
+      }
+
+
+      [data-tooltip]::after {
+        content: attr(data-tooltip);
+        position: absolute;
+        top: calc(100% + 6px);
+        left: 50%;
+        transform: translateX(-50%) translateY(-4px);
+        background: #000;
+        color: #fff;
+        font-size: 11px;
+        font-family: sans-serif;
+        white-space: nowrap;
+        padding: 4px 7px;
+        border-radius: 4px;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.12s ease, transform 0.12s ease;
+        z-index: 1000;
+      }
+
+      [data-tooltip]:hover::after,
+      [data-tooltip]:focus-visible::after {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        [data-tooltip]::after {
+          transition: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="toolbar">
+      <div class="toolbar-group">
+        <button id="mode-node" class="toolbar-btn" data-tooltip="Place Node">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-circle-dot-dashed-icon lucide-circle-dot-dashed"><path d="M10.1 2.18a9.93 9.93 0 0 1 3.8 0"/><path d="M17.6 3.71a9.95 9.95 0 0 1 2.69 2.7"/><path d="M21.82 10.1a9.93 9.93 0 0 1 0 3.8"/><path d="M20.29 17.6a9.95 9.95 0 0 1-2.7 2.69"/><path d="M13.9 21.82a9.94 9.94 0 0 1-3.8 0"/><path d="M6.4 20.29a9.95 9.95 0 0 1-2.69-2.7"/><path d="M2.18 13.9a9.93 9.93 0 0 1 0-3.8"/><path d="M3.71 6.4a9.95 9.95 0 0 1 2.7-2.69"/><circle cx="12" cy="12" r="1"/></svg>
+        </button>
+        <button id="mode-triangle" class="toolbar-btn" data-tooltip="Make Triangle">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-triangle-icon lucide-triangle"><path d="M13.73 4a2 2 0 0 0-3.46 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/></svg>        
+        </button>
+        <button id="mode-rectangle" class="toolbar-btn" data-tooltip="Make Rectangle">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-rectangle-horizontal-icon lucide-rectangle-horizontal"><rect width="20" height="12" x="2" y="6" rx="2"/></svg>
+        </button>
+      </div>
+
+      <div class="toolbar-group">
+        <label class="toolbar-control" data-tooltip="Material">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-layers-icon lucide-layers"><path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z"/><path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12"/><path d="M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17"/></svg>
+          <select id="material-select"></select>
+        </label>
+        <label class="toolbar-control" data-tooltip="Mesh Refinement">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-grid2x2-plus-icon lucide-grid-2x2-plus"><path d="M12 3v17a1 1 0 0 1-1 1H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v6a1 1 0 0 1-1 1H3"/><path d="M16 19h6"/><path d="M19 22v-6"/></svg>
+          <input id="refine-input" type="number" value="1" min="0" max="8">
+        </label>
+      </div>
+
+      <div class="toolbar-group">
+        <button id="calculate-btn" class="toolbar-btn" data-tooltip="Calculate">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-play-icon lucide-play"><path d="M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z"/></svg>
+        </button>
+      </div>
+
+      <div class="toolbar-group">
+        <button id="toggle-stress-btn" class="toolbar-btn" data-tooltip="Toggle Stress">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-paint-bucket-icon lucide-paint-bucket"><path d="M11 7 6 2"/><path d="M18.992 12H2.041"/><path d="M21.145 18.38A3.34 3.34 0 0 1 20 16.5a3.3 3.3 0 0 1-1.145 1.88c-.575.46-.855 1.02-.855 1.595A2 2 0 0 0 20 22a2 2 0 0 0 2-2.025c0-.58-.285-1.13-.855-1.595"/><path d="m8.5 4.5 2.148-2.148a1.205 1.205 0 0 1 1.704 0l7.296 7.296a1.205 1.205 0 0 1 0 1.704l-7.592 7.592a3.615 3.615 0 0 1-5.112 0l-3.888-3.888a3.615 3.615 0 0 1 0-5.112L5.67 7.33"/></svg>
+        </button>
+        <button id="toggle-scale-btn" class="toolbar-btn active" data-tooltip="Toggle Stress Scale">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chart-no-axes-column-icon lucide-chart-no-axes-column"><path d="M5 21v-6"/><path d="M12 21V3"/><path d="M19 21V9"/></svg>
+          <span id="scale-mode-badge" class="btn-badge">Lin</span>
+        </button>
+        <button id="toggle-outlines-btn" class="toolbar-btn" data-tooltip="Toggle Outlines">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-square-dashed-icon lucide-square-dashed"><path d="M5 3a2 2 0 0 0-2 2"/><path d="M19 3a2 2 0 0 1 2 2"/><path d="M21 19a2 2 0 0 1-2 2"/><path d="M5 21a2 2 0 0 1-2-2"/><path d="M9 3h1"/><path d="M9 21h1"/><path d="M14 3h1"/><path d="M14 21h1"/><path d="M3 9v1"/><path d="M21 9v1"/><path d="M3 14v1"/><path d="M21 14v1"/></svg>
+        </button>
+        <button id="toggle-deformed-btn" class="toolbar-btn" data-tooltip="Toggle Deformation">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-activity-icon lucide-activity"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"/></svg>
+        </button>
+      </div>
+
+      <div class="toolbar-group">
+        <button id="clear-mesh-btn" class="toolbar-btn danger" data-tooltip="Clear Mesh">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-trash-icon lucide-trash"><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+        </button>
+      </div>
+
+      <div class="toolbar-group">
+        <label class="toolbar-control coord-x" data-tooltip="X coordinate">
+          X <input id="add-node-x" type="number" step="any">
+        </label>
+        <label class="toolbar-control coord-y" data-tooltip="Y coordinate">
+          Y <input id="add-node-y" type="number" step="any">
+        </label>
+        <button id="add-node-btn" class="toolbar-btn" data-tooltip="Add Node">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-plus-icon lucide-plus"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+        </button>
+      </div>
+    </div>
+    <div id="mouse-coords" style="position:fixed; left:16px; bottom:16px; background:#222; color:white; padding:6px 10px; border-radius:6px; font-size:0.8em; font-family:sans-serif; z-index:998;">
+      X: —, Y: —
+    </div>
+    <div id="stress-tooltip" style="display:none; position:fixed; background:#222; color:white; padding:6px 10px; border-radius:6px; font-size:0.8em; font-family:sans-serif; z-index:999; pointer-events:none;">
+    </div>
+    <div id="solve-status" style="display:none; position: fixed; bottom: 16px; right: 16px; background: #222; color: white; padding: 10px 14px; border-radius: 6px; font-size: 0.85em; align-items: center; gap: 8px; z-index: 999;">
+      <div class="spinner"></div>
+      <span id="solve-status-text">Solving...</span>
+    </div>
+    <div id="node-panel" style="display:none; position:absolute; background:#333; color:white; padding:10px; border-radius:4px;">
+      <strong>Edit Node</strong>
+      <span id="node-panel-coords" style="float:right; color:#999; font-size:0.75em; margin-left:12px;"></span>
+      <br>
+      <label>Force X: <input id="node-fx" type="number" value="0"></label><br>
+      <label>Force Y: <input id="node-fy" type="number" value="0"></label><br>
+      <label>Fix X: <input id="node-fixx" type="checkbox"></label>
+      <label>Fix Y: <input id="node-fixy" type="checkbox"></label><br>
+      <button id="node-panel-apply">Apply</button>
+      <button id="node-panel-cancel">Cancel</button>
+      <button id="node-panel-delete" style="background:#a33; color:white; border:none; border-radius:3px;">Delete</button>
+    </div>
+    <div id="edge-panel" style="display:none; position:absolute; background:#333; color:white; padding:10px; border-radius:4px;">
+      <strong>Edit Edge</strong><br>
+      <label>Type:
+        <select id="edge-type">
+          <option value="fix">Fix</option>
+          <option value="force">Force</option>
+        </select>
+      </label>
+
+      <div id="edge-fix-fields">
         <label><input type="checkbox" id="edge-fixx"> Fix X</label>
         <label><input type="checkbox" id="edge-fixy"> Fix Y</label>
-    </div>
+      </div>
+      <div id="material-panel" style="display:none; position:absolute; background:#333; color:white; padding:10px; border-radius:4px;">
+        <strong>Edit Element Material</strong><br>
+        <label>Material: <select id="material-panel-select"></select></label><br><br>
+        <button id="material-panel-apply">Apply</button>
+        <button id="material-panel-cancel">Cancel</button>
+      </div>
 
-    <div id="edge-force-fields" style="display:none;">
+      <div id="edge-force-fields" style="display:none;">
         <label>Force X: <input type="number" id="edge-fx" value="0"></label>
         <label>Force Y: <input type="number" id="edge-fy" value="0"></label>
+      </div>
+
+      <button id="edge-panel-apply">Apply</button>
+      <button id="edge-panel-cancel">Cancel</button>
+    </div>
+    <div id="scale-bar" class="scale-bar">
+      <div class="scale-bar-label">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-activity-icon lucide-activity"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"/></svg>
+        <path d="M3 14c2-6 5-9 7-4s5 6 7 0" />
+        </svg>
+        <span>Deformation scale</span>
+      </div>
+
+      <input type="number" id="deform-scale-min" class="scale-bound" value="0" aria-label="Minimum">
+
+      <div class="scale-track-wrap">
+        <input type="range" id="deform-scale-slider" min="0" max="1000" value="1" step="1">
+      </div>
+
+      <input type="number" id="deform-scale-max" class="scale-bound" value="1000" aria-label="Maximum">
+
+      <div class="scale-value"><span id="deform-scale-value">1</span>×</div>
     </div>
 
-    <button id="edge-panel-apply">Apply</button>
-    <button id="edge-panel-cancel">Cancel</button>
-  </div>
-  <div class="slider-control">
-    <div class="slider-label">
-      <label for="deform-scale-slider">Deformation scale:</label>
-      <span id="deform-scale-value">1</span>
+    <canvas id="canvas"></canvas>
+    <div id="stress-legend" style="display:none; position:fixed; right:20px; bottom:20px; background:#222; color:white; padding:16px 18px; border-radius:8px; font-size:0.9em; font-family:sans-serif; z-index:998; width:420px; box-shadow:0 2px 12px rgba(0,0,0,0.45);">
+      <div style="margin-bottom:10px; font-weight:bold;">Von Mises Stress (Pa)</div>
+      <canvas id="legend-bar-canvas" width="420" height="30" style="width:100%; height:30px; border-radius:4px; display:block;"></canvas>
+      <div id="legend-ticks" style="position:relative; height:18px; margin-top:6px; font-size:0.85em;"></div>
     </div>
-    <input type="range" id="deform-scale-slider" min="0" max="1000" value="1" step="1">
-    <div class="range-bounds">
-        <input type="number" id="deform-scale-min" value="0">
-        <input type="number" id="deform-scale-max" value="1000">
+    <script src="https://cdn.jsdelivr.net/npm/eruda"></script>
+    <script>eruda.init();</script>
+    <script src="app.js" defer></script>
+    <div id="warning-modal-overlay" class="modal-overlay" style="display:none;">
+      <div class="modal-box">
+        <h3 id="warning-modal-title">High refinement level</h3>
+        <p id="warning-modal-message" style="white-space:pre-line;">This mesh density has a high chance of crashing due to element count. Do you want to proceed?</p>
+        <label class="modal-checkbox">
+          <input type="checkbox" id="warning-dont-show-again">
+          Don't show this again
+        </label>
+        <div class="modal-buttons">
+          <button id="warning-cancel-btn">Cancel</button>
+          <button id="warning-proceed-btn">Proceed</button>
+        </div>
+      </div>
     </div>
-  </div>
-<canvas id="canvas"></canvas>
-  <div id="stress-legend" style="display:none; position:fixed; right:20px; bottom:20px; background:#222; color:white; padding:16px 18px; border-radius:8px; font-size:0.9em; font-family:sans-serif; z-index:998; width:420px; box-shadow:0 2px 12px rgba(0,0,0,0.45);">
-    <div style="margin-bottom:10px; font-weight:bold;">Von Mises Stress (Pa)</div>
-    <canvas id="legend-bar-canvas" width="420" height="30" style="width:100%; height:30px; border-radius:4px; display:block;"></canvas>
-    <div id="legend-ticks" style="position:relative; height:18px; margin-top:6px; font-size:0.85em;"></div>
-  </div>
-  <script src="app.js" defer></script>
-  <div id="warning-modal-overlay" class="modal-overlay" style="display:none;">
-    <div class="modal-box">
-      <h3 id="warning-modal-title">High refinement level</h3>
-      <p id="warning-modal-message" style="white-space:pre-line;">This mesh density has a high chance of crashing due to element count. Do you want to proceed?</p>
-      <label class="modal-checkbox">
-        <input type="checkbox" id="warning-dont-show-again">
-        Don't show this again
-      </label>
-      <div class="modal-buttons">
-        <button id="warning-cancel-btn">Cancel</button>
-        <button id="warning-proceed-btn">Proceed</button>
-    </div>
-  </div>
-  </div>
-</body>
+  </body>
 </html>

@@ -26,6 +26,7 @@ let showOutlines = false;
 let lastResult = null;
 let editingNode = null; 
 let editingEdge = null;
+let editingElement = null;
 let edgeRules = [];
 let scale = 1;
 let deformationScale = 50;
@@ -73,6 +74,17 @@ if (rectangleButton) {
 }
 updateModeButtons();
 
+function populateMaterialOptions(selectEl, selectedValue) {
+    selectEl.innerHTML = "";
+    for (const name of Object.keys(materials)) {
+        const opt = document.createElement("option");
+        opt.value = name;
+        opt.textContent = name.charAt(0).toUpperCase() + name.slice(1);
+        selectEl.appendChild(opt);
+    }
+    selectEl.value = selectedValue;
+}
+
 async function loadMaterials() {
     try {
         const response = await fetch("/materials");
@@ -83,15 +95,10 @@ async function loadMaterials() {
     }
     const select = document.getElementById("material-select");
     if (!select) return;
-    select.innerHTML = "";
-    for (const name of Object.keys(materials)) {
-        const opt = document.createElement("option");
-        opt.value = name;
-        opt.textContent = name.charAt(0).toUpperCase() + name.slice(1);
-        select.appendChild(opt);
-    }
-    select.value = currentMaterial;
+    populateMaterialOptions(select, currentMaterial);
 }
+
+loadMaterials();
 
 const materialSelect = document.getElementById("material-select");
 if (materialSelect) {
@@ -99,8 +106,6 @@ if (materialSelect) {
         currentMaterial = materialSelect.value;
     };
 }
-
-loadMaterials();
 
 function resizeCanvas() {
     const availableWidth = window.innerWidth;
@@ -175,6 +180,23 @@ function findEdgeNear(x, y, radius = NODE_SELECTION_RADIUS) {
     }
 
     return closestEdge;
+}
+
+function findElementNear(x, y) {
+    for (const el of elements) {
+        if (el.type !== "triangle") continue;
+        const [a, b, c] = el.node_ids.map(id => nodes.find(n => n.id === id));
+        if (!a || !b || !c) continue;
+
+        const denom = (b.y - c.y) * (a.x - c.x) + (c.x - b.x) * (a.y - c.y);
+        if (denom === 0) continue;
+        const w1 = ((b.y - c.y) * (x - c.x) + (c.x - b.x) * (y - c.y)) / denom;
+        const w2 = ((c.y - a.y) * (x - c.x) + (a.x - c.x) * (y - c.y)) / denom;
+        const w3 = 1 - w1 - w2;
+
+        if (w1 >= 0 && w2 >= 0 && w3 >= 0) return el;
+    }
+    return null;
 }
 
 function pointToSegmentDistance(px, py, ax, ay, bx, by) {
@@ -719,11 +741,29 @@ canvas.addEventListener("contextmenu", (e) => {
         panel.style.display = "block";
         return;
     }
+    const el = findElementNear(x, y);
+    if (el) {
+        showStress = false;
+        editingElement = el;
+        document.getElementById("node-panel").style.display = "none";
+        document.getElementById("edge-panel").style.display = "none";
+
+        const select = document.getElementById("material-panel-select");
+        populateMaterialOptions(select, el.material || currentMaterial);
+
+        const panel = document.getElementById("material-panel");
+        panel.style.left = e.pageX + "px";
+        panel.style.top = e.pageY + "px";
+        panel.style.display = "block";
+        return;
+    }
+
 });
 
 function closeAllPanels() {
     document.getElementById("node-panel").style.display = "none";
     document.getElementById("edge-panel").style.display = "none";
+    document.getElementById("material-panel").style.display = "none";
 }
 
 function findOrCreateNode(x, y, tolerance = 0.01) {
@@ -743,7 +783,17 @@ function findOrCreateNode(x, y, tolerance = 0.01) {
     nodes.push(newNode);
     return newNode;
 }
-    
+document.getElementById("material-panel-apply").onclick = () => {
+    if (!editingElement) return;
+    editingElement.material = document.getElementById("material-panel-select").value;
+    document.getElementById("material-panel").style.display = "none";
+    editingElement = null;
+    draw();
+};
+document.getElementById("material-panel-cancel").onclick = () => {
+    document.getElementById("material-panel").style.display = "none";
+    editingElement = null;
+};
 
 document.getElementById("node-panel-apply").onclick = () => {
     if (!editingNode) return;
@@ -1086,8 +1136,8 @@ document.getElementById("toggle-stress-btn").onclick = () => {
 };
 document.getElementById("toggle-scale-btn").onclick = () => {
     stressScaleMode = stressScaleMode === "linear" ? "log" : "linear";
-    document.getElementById("toggle-scale-btn").textContent =
-        stressScaleMode === "linear" ? "Scale: Linear" : "Scale: Log";
+    document.getElementById("scale-mode-badge").textContent =
+        stressScaleMode === "linear" ? "Lin" : "Log";
     draw();
 };
 document.getElementById("toggle-deformed-btn").onclick = () => {
@@ -1106,30 +1156,35 @@ const deformSlider = document.getElementById("deform-scale-slider");
 const deformMinInput = document.getElementById("deform-scale-min");
 const deformMaxInput = document.getElementById("deform-scale-max");
 
+function updateScaleFill() {
+    const min = parseFloat(deformSlider.min) || 0;
+    const max = parseFloat(deformSlider.max) || 1;
+    const val = parseFloat(deformSlider.value) || 0;
+    const pct = max > min ? ((val - min) / (max - min)) * 100 : 0;
+    deformSlider.style.setProperty("--fill", pct + "%");
+}
 if (deformSlider) {
     deformSlider.addEventListener("input", () => {
         deformationScale = parseFloat(deformSlider.value) || 0;
         document.getElementById("deform-scale-value").textContent = deformationScale;
+        updateScaleFill();
         draw();
     });
 }
-
 if (deformMinInput) {
     deformMinInput.addEventListener("input", () => {
         const min = parseFloat(deformMinInput.value) || 0;
         deformSlider.min = min;
+        updateScaleFill();
     });
 }
-
 if (deformMaxInput) {
     deformMaxInput.addEventListener("input", () => {
         const max = parseFloat(deformMaxInput.value) || 200;
         deformSlider.max = max;
+        updateScaleFill();
     });
-
 }
-
-
+updateScaleFill();
 
 draw();
- 

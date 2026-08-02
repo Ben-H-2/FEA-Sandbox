@@ -327,6 +327,10 @@ JS->>JS: recordSolveTime() — localStorage
 | `ELEMENT_SELECTION_RADIUS` | `app.js` | Configures the range around an element where it can be selected |
 | `NODE_RADIUS` | `app.js` | Configures the size of nodes in the editable mesh |
 
+## Credits
+
+Toolbar icons by [Lucide](https://lucide.dev) — ISC License.
+
 ## Contributing
 
 All contributions are welcome
