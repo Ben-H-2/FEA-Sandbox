@@ -1053,6 +1053,21 @@ document.getElementById("calculate-btn").onclick = async () => {
         showStress = false;
         syncToggleButton("toggle-stress-btn", showStress);
         draw();
+        alert("Cannot calculate -> no nodes or elements in the mesh.");
+        return;
+    }
+
+    const hasSupport = nodes.some(node => node.is_fixed_x || node.is_fixed_y);
+
+    if (!hasSupport) {
+        alert("Your model has no supports.");
+        return;
+    }
+
+    const hasLoad = nodes.some(node => node.force_x !== 0 || node.force_y !== 0);
+
+    if (!hasLoad) {
+        alert("Your model has no applied loads.");
         return;
     }
 
