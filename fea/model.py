@@ -39,11 +39,11 @@ class AnalysisModel:
         return element
     
     def _add_default_materials(self):
-        for name, (E, nu) in DEFAULT_MATERIALS.items():
-            self.add_material(name, E=E, nu=nu)
+        for name, (E, nu, colour) in DEFAULT_MATERIALS.items():
+            self.add_material(name, E=E, nu=nu, colour = colour)
         
-    def add_material(self, name, E, nu):
-        material = Material(name=name, E=E, nu=nu)
+    def add_material(self, name, E, nu, colour = "#808080"):
+        material = Material(name=name, E=E, nu=nu, colour=colour)
         self.materials[name] = material
         return material
 

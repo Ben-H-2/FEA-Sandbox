@@ -63,7 +63,7 @@ def root():
 
 @app.get("/materials")
 def get_materials():
-    return {name: {"E": E, "nu": nu} for name, (E, nu) in DEFAULT_MATERIALS.items()}
+    return {name: {"E": E, "nu": nu, "colour": colour} for name, (E, nu, colour) in DEFAULT_MATERIALS.items()}
 
 @app.post("/calculate")
 def calculate(req: CalculateRequest):
