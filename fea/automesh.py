@@ -64,7 +64,11 @@ def build_region_list(regions, model):
     tag_meta = {}
     for i, region in enumerate(regions):
         tag = i + 1
+
+        # NOTE: centroid fallback fails for regions with a hole near their center
+        # (annulus-shaped regions) so pass am explicit interior_point in that case.
         interior = region.get("interior_point") or _polygon_centroid(region["boundary"])
+
         max_area = region.get("max_area",0)
         region_list.append([interior[0], interior[1], tag, max_area])
         material = region["material"]
