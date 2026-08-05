@@ -7,7 +7,7 @@ STATIC_DIR = BASE_DIR / "static"
 if str(BASE_DIR) not in sys.path:
     sys.path.insert(0, str(BASE_DIR))
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -16,6 +16,7 @@ from fea.mesh import refine_mesh, apply_edge_rules
 from fea.model import AnalysisModel
 from fea.element import Element, TriangleElement
 from fea.material import DEFAULT_MATERIALS
+from fea.automesh import generate_mesh_from_regions
 
 app = FastAPI()
 
@@ -44,6 +45,22 @@ class ElementIn(BaseModel):
     A: float = 0.001
     thickness: float = 0.01
 
+class HoleIn(BaseModel):
+    boundary: list[tuple[float,float]]
+    interior_point: tuple[float,float] | None = None
+
+class RegionIn(BaseModel):
+    boundary: list[tuple[float,float]]
+    material: str = "steel"
+    thickness: float = 0.01
+    max_area: float | None = None
+    interior_point: tuple[float, float] | None = None
+
+class AutomeshRequest(BaseModel):
+    regions: list[RegionIn]
+    holes: list[HoleIn] = []
+    min_angle: float = 30
+    
 class CalculateRequest(BaseModel):
     edge_rules: list[EdgeRuleIn] = []
     nodes: list[NodeIn]
@@ -65,6 +82,27 @@ def root():
 def get_materials():
     return {name: {"E": E, "nu": nu, "colour": colour} for name, (E, nu, colour) in DEFAULT_MATERIALS.items()}
 
+@app.post("/automesh")
+def automesh(req: AutomeshRequest):
+    model = AnalysisModel()
+    regions = [r.model_dump() for r in req.regions]
+    holes = [h.model_dump() for h in req.holes]
+    try:
+        created_elements = generate_mesh_from_regions(model = model, regions = regions, holes = holes, min_angle = req.min_angle)
+    except ValueError as exc:
+        raise HTTPException(status_code = 400, detail = str(exc))
+    node_index = {n: i for i, n in enumerate(model.nodes)}
+    return {
+        "nodes": [
+            {"id": node_index[n], "posx": n.posx, "posy": n.posy}
+            for n in model.nodes
+        ],
+        "elements": [
+            {"node_ids": [node_index[n] for n in el.get_nodes()], "material": el.material.name,"thickness": el.thickness }
+            for el in created_elements
+        ]}
+    
+
 @app.post("/calculate")
 def calculate(req: CalculateRequest):
     if not req.nodes or not req.elements:
@@ -76,7 +114,6 @@ def calculate(req: CalculateRequest):
         node.force_x, node.force_y = n.force_x, n.force_y
         node.is_fixed_x, node.is_fixed_y = n.is_fixed_x, n.is_fixed_y
         id_to_node[n.id] = node
-
     
     for e in req.elements:
         nodes = [id_to_node[i] for i in e.node_ids]

@@ -12,7 +12,7 @@ const PERSIST_DONT_SHOW_AGAIN = false;
 const MIN_SOLVE_SAMPLES = 4;
 const LEGEND_TICK_COUNT = 6;
 const SHOW_HOVER_TOOLTIP = true;
-const MATERIAL_FILL_ALPHA = 0.18;
+const MATERIAL_FILL_ALPHA = 0.3;
 
 let nodes = []; 
 let elements = []; 
@@ -1118,7 +1118,7 @@ document.getElementById("calculate-btn").onclick = async () => {
                 is_fixed_x: n.is_fixed_x, is_fixed_y: n.is_fixed_y
             })),
             elements: elements.map(el => ({
-            type: el.type, node_ids: el.node_ids, material: el.material || "steel"})),
+            type: el.type, node_ids: el.node_ids, material: el.material || "steel", thickness: el.thickness || 0.01 })),
             refine_times: refineTimes,
             edge_rules: edgeRules
         };
