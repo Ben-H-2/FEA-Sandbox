@@ -25,8 +25,8 @@ let nodes = [];
 let elements = []; 
 let nextNodeId = 0;
 let mode = "node";
-let gridEnabled = false;
-let snapEnabled = false;
+let gridEnabled = true;
+let snapEnabled = true;
 let lastSnapPoint = null; 
 let materials = {};
 let currentMaterial = "steel";
@@ -39,6 +39,9 @@ let editingNode = null;
 let editingEdge = null;
 let editingElement = null;
 let edgeRules = [];
+let currentPolygonPoints = [];
+let polygonShapes = [];
+let polygonShapeType = "polygon";
 let scale = 1;
 let deformationScale = 50;
 let stressScaleMode = "linear";
@@ -47,6 +50,7 @@ function updateModeButtons() {
     const nodeButton = document.getElementById("mode-node");
     const triangleButton = document.getElementById("mode-triangle");
     const rectangleButton = document.getElementById("mode-rectangle")
+    const automeshButton = document.getElementById("mode-automesh")
 
     if (nodeButton) {
         nodeButton.classList.toggle("active", mode === "node");
@@ -57,11 +61,15 @@ function updateModeButtons() {
     if (rectangleButton) {
         rectangleButton.classList.toggle("active", mode == "rectangle")
     }
+    if (automeshButton){
+        automeshButton.classList.toggle("active", mode == "automesh")
+    }
 }
 
 function setMode(newMode) { 
     selectedNodeIds = []
     mode = newMode;
+    console.log(mode)
     draw()
     updateModeButtons();
 }
@@ -83,6 +91,8 @@ if (gridButton) {
     };
 }
 if (snapButton) {
+    syncToggleButton("toggle-grid-btn", gridEnabled);
+    syncToggleButton("toggle-snap-btn", snapEnabled);
     snapButton.onclick = () => {
         snapEnabled = !snapEnabled;
         syncToggleButton("toggle-snap-btn", snapEnabled);
@@ -93,6 +103,8 @@ if (snapButton) {
 const nodeButton = document.getElementById("mode-node");
 const triangleButton = document.getElementById("mode-triangle");
 const rectangleButton = document.getElementById("mode-rectangle")
+const automeshButton = document.getElementById("mode-automesh")
+
 if (nodeButton) {
     nodeButton.onclick = () => setMode("node");
 }
@@ -101,6 +113,9 @@ if (triangleButton) {
 }
 if (rectangleButton) {
     rectangleButton.onclick = () => setMode("rectangle")
+}
+if (automeshButton) {
+    automeshButton.onclick = () => setMode("automesh");
 }
 updateModeButtons();
 
@@ -766,24 +781,44 @@ canvas.addEventListener("click", (e) => {
         }
     } else if (mode == "rectangle") {
         showStress = false;
-        const Node = snap.node || findNodeNear(snap.x, snap.y);
-        if (!Node) return;
+        const node = snap.node || findNodeNear(snap.x, snap.y);
+        if (!node) return;
 
-        if (selectedNodeIds.includes(Node.id)) {
-            selectedNodeIds = selectedNodeIds.filter(id => id !== Node.id);
+        if (selectedNodeIds.includes(node.id)) {
+            selectedNodeIds = selectedNodeIds.filter(id => id !== node.id);
         } else {
-            selectedNodeIds.push(Node.id);
+            selectedNodeIds.push(node.id);
         }
 
         if (selectedNodeIds.length === 2) {
-            let node_a = nodes.find(n => n.id === selectedNodeIds[0]);
-            let node_b = nodes.find(n => n.id === selectedNodeIds[1]);
-            let node_c = findOrCreateNode(node_a.x, node_b.y);
-            let node_d = findOrCreateNode(node_b.x, node_a.y)
-            elements.push({ type: "triangle", node_ids: [node_a.id,node_c.id,node_d.id], material: currentMaterial})
-            elements.push({ type: "triangle", node_ids: [node_b.id,node_c.id,node_d.id], material: currentMaterial});
-            selectedNodeIds = []
+            const node_a = nodes.find(n => n.id === selectedNodeIds[0]);
+            const node_b = nodes.find(n => n.id === selectedNodeIds[1]);
+            const node_c = findOrCreateNode(node_a.x, node_b.y);
+            const node_d = findOrCreateNode(node_b.x, node_a.y);
+            elements.push({ type: "triangle", node_ids: [node_a.id, node_c.id, node_d.id], material: currentMaterial });
+            elements.push({ type: "triangle", node_ids: [node_b.id, node_c.id, node_d.id], material: currentMaterial });
+            selectedNodeIds = [];
         }
+    } else if (mode === "automesh") {
+
+        if (currentPolygonPoints.length >= 3) {
+            const first = currentPolygonPoints[0];
+            const dx = snap.x - first.x;
+            const dy = snap.y - first.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+
+            if (dist <= NODE_SNAP_RADIUS) {
+                polygonShapes.push({
+                    type: polygonShapeType,
+                    boundary: [...currentPolygonPoints],
+                    material: currentMaterial
+                });
+                currentPolygonPoints = [];
+                return;
+            }
+        }
+
+        currentPolygonPoints.push({ x: snap.x, y: snap.y });
     }
     draw();
 });
