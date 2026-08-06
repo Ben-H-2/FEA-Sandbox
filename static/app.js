@@ -60,7 +60,9 @@ function updateModeButtons() {
 }
 
 function setMode(newMode) { 
+    selectedNodeIds = []
     mode = newMode;
+    draw()
     updateModeButtons();
 }
 
