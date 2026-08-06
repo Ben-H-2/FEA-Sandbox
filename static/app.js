@@ -13,11 +13,21 @@ const MIN_SOLVE_SAMPLES = 4;
 const LEGEND_TICK_COUNT = 6;
 const SHOW_HOVER_TOOLTIP = true;
 const MATERIAL_FILL_ALPHA = 0.3;
+const GRID_SPACING = 20;
+const NODE_SNAP_RADIUS = 10;
+const EDGE_SNAP_RADIUS = 8;
+const GRID_SNAP_RADIUS = 10;    
+const GRID_COLOR = "rgba(0,0,0,0.08)";
+const SNAP_MARKER_COLOR = "#e0a800";
+
 
 let nodes = []; 
 let elements = []; 
 let nextNodeId = 0;
 let mode = "node";
+let gridEnabled = false;
+let snapEnabled = false;
+let lastSnapPoint = null; 
 let materials = {};
 let currentMaterial = "steel";
 let selectedNodeIds = [];
@@ -59,6 +69,23 @@ function syncToggleButton(buttonId, isActive) {
     if (btn) {
         btn.classList.toggle("active", isActive);
     }
+}
+
+const gridButton = document.getElementById("toggle-grid-btn");
+const snapButton = document.getElementById("toggle-snap-btn");
+if (gridButton) {
+    gridButton.onclick = () => {
+        gridEnabled = !gridEnabled;
+        syncToggleButton("toggle-grid-btn", gridEnabled);
+        draw();
+    };
+}
+if (snapButton) {
+    snapButton.onclick = () => {
+        snapEnabled = !snapEnabled;
+        syncToggleButton("toggle-snap-btn", snapEnabled);
+        draw();
+    };
 }
 
 const nodeButton = document.getElementById("mode-node");
@@ -208,6 +235,54 @@ function findElementNear(x, y) {
     return null;
 }
 
+function distToSegment(px, py, ax, ay, bx, by) {
+    const dx = bx - ax, dy = by - ay;
+    const lenSq = dx * dx + dy * dy;
+    let t = lenSq === 0 ? 0 : ((px - ax) * dx + (py - ay) * dy) / lenSq;
+    t = Math.max(0, Math.min(1, t));
+    const cx = ax + t * dx, cy = ay + t * dy;
+    return { dist: Math.hypot(px - cx, py - cy), x: cx, y: cy };
+}
+
+function findNearestEdgePoint(x, y, radius) {
+    let best = null;
+    for (const el of elements) {
+        const pts = el.node_ids.map(id => nodes.find(n => n.id === id)).filter(Boolean);
+        for (let i = 0; i < pts.length; i++) {
+            const a = pts[i], b = pts[(i + 1) % pts.length];
+            const hit = distToSegment(x, y, a.x, a.y, b.x, b.y);
+            if (hit.dist <= radius && (!best || hit.dist < best.dist)) {
+                best = { dist: hit.dist, x: hit.x, y: hit.y };
+            }
+        }
+    }
+    return best;
+}
+
+function findNearestGridPoint(x, y, radius) {
+    const gx = Math.round(x / GRID_SPACING) * GRID_SPACING;
+    const gy = Math.round(y / GRID_SPACING) * GRID_SPACING;
+    const dist = Math.hypot(x - gx, y - gy);
+    return dist <= radius ? { dist, x: gx, y: gy } : null;
+}
+
+function getSnapPoint(x, y) {
+    if (!snapEnabled) return { x, y, node: null };
+
+    const node = findNodeNear(x, y, NODE_SNAP_RADIUS);
+    if (node) return { x: node.x, y: node.y, node };
+
+    const edgeHit = findNearestEdgePoint(x, y, EDGE_SNAP_RADIUS);
+    if (edgeHit) return { x: edgeHit.x, y: edgeHit.y, node: null };
+
+    if (gridEnabled) {
+        const gridHit = findNearestGridPoint(x, y, GRID_SNAP_RADIUS);
+        if (gridHit) return { x: gridHit.x, y: gridHit.y, node: null };
+    }
+
+    return { x, y, node: null };
+}
+
 function pointToSegmentDistance(px, py, ax, ay, bx, by) {
     const dx = bx - ax;
     const dy = by - ay;
@@ -274,7 +349,6 @@ function findResultElementAt(x, y) {
         const a = nodeById.get(idA), b = nodeById.get(idB), c = nodeById.get(idC);
         if (!a || !b || !c) continue;
 
-        // account for deformed view, same as drawResultMesh
         const pa = showDeformed
             ? {x: a.posx + lastResult.displacements[idA*2]*deformationScale, y: a.posy + lastResult.displacements[idA*2+1]*deformationScale}
             : {x: a.posx, y: a.posy};
@@ -577,8 +651,27 @@ function drawEditableMesh() {
     });
 }
 
+function drawGrid() {
+    if (!gridEnabled) return;
+    ctx.strokeStyle = GRID_COLOR;
+    ctx.lineWidth = 1;
+    for (let x = 0; x <= LOGICAL_WIDTH; x += GRID_SPACING) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, LOGICAL_HEIGHT);
+        ctx.stroke();
+    }
+    for (let y = 0; y <= LOGICAL_HEIGHT; y += GRID_SPACING) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(LOGICAL_WIDTH, y);
+        ctx.stroke();
+    }
+}
+
 function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+    drawGrid()
     if (showStress && lastResult) {
         drawResultMesh(); 
     } else {
@@ -592,6 +685,14 @@ canvas.addEventListener("mousemove", (e) => {
     const coordBox = document.getElementById("mouse-coords");
     if (coordBox) {
         coordBox.textContent = `X: ${x.toFixed(1)}, Y: ${(LOGICAL_HEIGHT-y).toFixed(1)}`;
+    }
+    draw();
+    if (snapEnabled) {
+        ctx.beginPath();
+        ctx.arc(lastSnapPoint.x, lastSnapPoint.y, 5, 0, Math.PI * 2);
+        ctx.strokeStyle = SNAP_MARKER_COLOR;
+        ctx.lineWidth = 2;
+        ctx.stroke();
     }
 
     const tooltip = document.getElementById("stress-tooltip");
@@ -631,21 +732,23 @@ document.getElementById("add-node-btn").onclick = () => {
     draw();
 };
 
-canvas.addEventListener("click", (e) => { 
-    const x = e.offsetX / scale, y = e.offsetY / scale;
+canvas.addEventListener("click", (e) => {
+    const raw = { x: e.offsetX / scale, y: e.offsetY / scale };
+    const snap = getSnapPoint(raw.x, raw.y);
 
     if (mode === "node") {
-        showStress = false; 
-        nodes.push({
-            id: nextNodeId++,
-            x: x, y: y,
-            force_x: 0, force_y: 0,
-            is_fixed_x: false, is_fixed_y: false
-        });
-        draw();
-} else if (mode === "triangle") {
-        showStress = false; // same as previous
-        const node = findNodeNear(x, y);
+        showStress = false;
+        if (!snap.node) {
+            nodes.push({
+                id: nextNodeId++,
+                x: snap.x, y: snap.y,
+                force_x: 0, force_y: 0,
+                is_fixed_x: false, is_fixed_y: false
+            });
+        }
+    } else if (mode === "triangle") {
+        showStress = false;
+        const node = snap.node || findNodeNear(snap.x, snap.y);
         if (!node) return;
 
         if (selectedNodeIds.includes(node.id)) {
@@ -660,7 +763,7 @@ canvas.addEventListener("click", (e) => {
         }
     } else if (mode == "rectangle") {
         showStress = false;
-        const Node = findNodeNear(x, y);
+        const Node = snap.node || findNodeNear(snap.x, snap.y);
         if (!Node) return;
 
         if (selectedNodeIds.includes(Node.id)) {
@@ -679,7 +782,7 @@ canvas.addEventListener("click", (e) => {
             selectedNodeIds = []
         }
     }
-        draw();
+    draw();
 });
 
 
