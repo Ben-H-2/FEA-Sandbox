@@ -682,6 +682,7 @@ function draw() {
 
 canvas.addEventListener("mousemove", (e) => {
     const x = e.offsetX / scale, y = e.offsetY / scale;
+    lastSnapPoint = getSnapPoint(x,y)
     const coordBox = document.getElementById("mouse-coords");
     if (coordBox) {
         coordBox.textContent = `X: ${x.toFixed(1)}, Y: ${(LOGICAL_HEIGHT-y).toFixed(1)}`;
