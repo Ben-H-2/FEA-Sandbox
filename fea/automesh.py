@@ -24,6 +24,51 @@ from fea.element import TriangleElement
 coord_precision = 9
 default_thickness = 0.01
 
+def _scanline_crossings(y, boundary): #uses even-odd rule to scan horizontally and find areas of polygon and hole
+    xs = []
+    n = len(boundary)
+    for i in range(n):
+        x0, y0 = boundary[i]
+        x1, y1 = boundary[(i + 1) % n]
+        if (y0 > y) != (y1 > y):
+            xs.append(x0 + (y - y0) * (x1 - x0) / (y1 - y0))
+    return xs
+
+def _point_in_polygon(pt, boundary):
+    x, y = pt
+    inside = False
+    n = len(boundary)
+    for i in range(n):
+        x0, y0 = boundary[i]
+        x1, y1 = boundary[(i + 1) % n]
+        if (y0 > y) != (y1 > y):
+            x_int = x0 + (y - y0) * (x1 - x0) / (y1 - y0)
+            if x_int > x:
+                inside = not inside
+    return inside
+
+def _find_interior_point(boundary, hole_boundaries=None, samples=21):
+    hole_boundaries = hole_boundaries or []
+    ys = [p[1] for p in boundary]
+    y_min, y_max = min(ys), max(ys)
+
+    best = None  # (width, x_mid, y)
+    for i in range(1, samples + 1):
+        y = y_min + (y_max - y_min) * i / (samples + 1)
+        xs = _scanline_crossings(y, boundary)
+        for hole in hole_boundaries:
+            xs += _scanline_crossings(y, hole)
+        xs.sort()
+        for j in range(0, len(xs) - 1, 2):
+            width = xs[j + 1] - xs[j]
+            if best is None or width > best[0]:
+                best = (width, (xs[j] + xs[j + 1]) / 2, y)
+
+    if best is None:
+        return _polygon_centroid(boundary)
+    return (best[1], best[2])
+
+
 def _polygon_centroid(points):
     n = len(points)
     signed_area_sum = 0
@@ -59,17 +104,23 @@ def add_loop_segments(boundary, registry, segments):
         for i in range(n):
             segments.append((idxs[i], idxs[(i+1) % n]))
 
-def build_region_list(regions, model):
+def build_region_list(regions, model, holes=None):
+    holes = holes or []
     region_list = []
     tag_meta = {}
     for i, region in enumerate(regions):
         tag = i + 1
 
-        # NOTE: centroid fallback fails for regions with a hole near their center
-        # (annulus-shaped regions) so pass am explicit interior_point in that case.
-        interior = region.get("interior_point") or _polygon_centroid(region["boundary"])
+        if "interior_point" in region and region["interior_point"]:
+            interior = region["interior_point"]
+        else:
+            relevant_holes = [
+                h["boundary"] for h in holes
+                if _point_in_polygon(_polygon_centroid(h["boundary"]), region["boundary"])
+            ]
+            interior = _find_interior_point(region["boundary"], relevant_holes)
 
-        max_area = region.get("max_area",0)
+        max_area = region.get("max_area", 0)
         region_list.append([interior[0], interior[1], tag, max_area])
         material = region["material"]
         if isinstance(material, str):
@@ -109,7 +160,7 @@ def generate_mesh_from_regions(model, regions, holes=None, min_angle=30):
     for hole in holes:
         add_loop_segments(hole["boundary"], reg, segments)
 
-    region_list, tag_meta = build_region_list(regions, model)
+    region_list, tag_meta = build_region_list(regions = regions,model = model,holes = holes)
     hole_points = build_hole_points(holes)
 
     mesh_input = {"vertices": reg.vertices, "segments": segments, "regions": region_list,}
