@@ -41,7 +41,7 @@ let editingElement = null;
 let edgeRules = [];
 let currentPolygonPoints = [];
 let polygonShapes = [];
-let polygonShapeType = "polygon";
+let polygonShapeType = "region";
 let scale = 1;
 let deformationScale = 50;
 let stressScaleMode = "linear";
@@ -78,6 +78,13 @@ function syncToggleButton(buttonId, isActive) {
     const btn = document.getElementById(buttonId);
     if (btn) {
         btn.classList.toggle("active", isActive);
+    }
+}
+
+function syncShapeTypeBadge() {
+    const badge = document.getElementById("shape-type-badge");
+    if (badge) {
+        badge.textContent = polygonShapeType === "region" ? "Region" : "Hole";
     }
 }
 
@@ -1294,6 +1301,16 @@ document.getElementById("calculate-btn").onclick = async () => {
         statusEl.style.display = "none";
     }
 };
+
+const shapeTypeButton = document.getElementById("toggle-shape-type-btn");
+if (shapeTypeButton) {
+    shapeTypeButton.onclick = () => {
+        polygonShapeType = polygonShapeType === "region" ? "hole" : "region";
+        syncShapeTypeBadge();
+        draw();
+    };
+}
+syncShapeTypeBadge();
 
 document.getElementById("toggle-stress-btn").onclick = () => {
     showStress = !showStress;
