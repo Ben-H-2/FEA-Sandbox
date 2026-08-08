@@ -1,11 +1,11 @@
-const canvas = document.getElementById("canvas"); 
-const ctx = canvas.getContext("2d")
-const NODE_RADIUS = 3; 
-const NODE_SELECTION_RADIUS = 16; 
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+const NODE_RADIUS = 3;
+const NODE_SELECTION_RADIUS = 16;
 const ELEMENT_SELECTION_RADIUS = 16;
 const LOGICAL_WIDTH = 900;
 const LOGICAL_HEIGHT = 600;
-const REFINE_WARNING_THRESHOLD = 5; 
+const REFINE_WARNING_THRESHOLD = 5;
 const warningOverlay = document.getElementById("warning-modal-overlay");
 const dontShowAgainCheckbox = document.getElementById("warning-dont-show-again");
 const PERSIST_DONT_SHOW_AGAIN = false;
@@ -16,10 +16,11 @@ const MATERIAL_FILL_ALPHA = 0.3;
 const GRID_SPACING = 20;
 const NODE_SNAP_RADIUS = 10;
 const EDGE_SNAP_RADIUS = 8;
-const GRID_SNAP_RADIUS = 10;    
+const GRID_SNAP_RADIUS = 10;
 const GRID_COLOR = "rgba(0,0,0,0.08)";
-const SNAP_MARKER_COLOR = "#e0a800";
-
+const SNAP_MARKER_COLOR = "#1cb7bd";
+const REGION_COLOR = "#2563eb";
+const HOLE_COLOR = "#dc2626";
 
 let nodes = []; 
 let elements = []; 
@@ -693,6 +694,27 @@ function drawGrid() {
     }
 }
 
+function drawPolygons() {
+    if (mode !== "automesh") return;
+    if (currentPolygonPoints.length > 0) {
+        ctx.beginPath();
+        ctx.moveTo(currentPolygonPoints[0].x, currentPolygonPoints[0].y);
+        for (let i = 1; i < currentPolygonPoints.length; i++) {
+            ctx.lineTo(currentPolygonPoints[i].x, currentPolygonPoints[i].y);
+        }
+        ctx.strokeStyle = polygonShapeType === "region" ? REGION_COLOR : HOLE_COLOR;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        currentPolygonPoints.forEach(p => {
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
+            ctx.fillStyle = polygonShapeType === "region" ? REGION_COLOR : HOLE_COLOR;
+            ctx.fill();
+        });
+    }
+}
+
 function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     drawGrid()
@@ -701,6 +723,7 @@ function draw() {
     } else {
         hideStressLegend();
         drawEditableMesh(); 
+        drawPolygons();
     }
 }
 
