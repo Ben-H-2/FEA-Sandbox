@@ -374,6 +374,58 @@ function pointInTriangle(px, py, ax, ay, bx, by, cx, cy) {
     return !(hasNeg && hasPos);
 }
 
+function pointInPolygon(px, py, polygon) {
+    let counter = 0
+    for (let i = 0; i < polygon.length; i++){
+        const currentCoord = polygon[i];
+        const nextCoord = polygon[(i+1)%polygon.length];
+        if (!((py>currentCoord.y && py>nextCoord.y) || (py<currentCoord.y && py<nextCoord.y))){
+            const t = (py - currentCoord.y) / (nextCoord.y - currentCoord.y);
+            const x_crossing = currentCoord.x + t * (nextCoord.x - currentCoord.x);
+            if (x_crossing > px){
+                counter++;
+            }
+        }
+    }
+    return (counter%2 == 1);
+}
+
+function findBoundingBox(polygon){
+    let max_x= polygon[0].x;
+    let min_x= polygon[0].x;
+    let max_y= polygon[0].y;
+    let min_y= polygon[0].y;
+    for (let i = 0; i<polygon.length; i++){
+        if (polygon[i].x > max_x){
+            max_x = polygon[i].x;
+        }
+        if (polygon[i].x < min_x){
+            min_x = polygon[i].x;
+        }
+        if (polygon[i].y > max_y){
+            max_y = polygon[i].y;
+        }
+        if (polygon[i].y < min_y){
+            min_y = polygon[i].y;
+        }
+        
+    }
+    return {min_x,max_x,min_y,max_y};
+}
+
+function boxesOverlap(boxA, boxB){
+    const boxAbounds = findBoundingBox(boxA);
+    const boxBbounds = findBoundingBox(boxB);
+    if ((boxAbounds.min_x<boxBbounds.max_x) && (boxAbounds.min_y<boxBbounds.max_y) && (boxBbounds.min_x<boxAbounds.max_x) && (boxBbounds.min_y<boxAbounds.max_y)){
+        return true
+    }
+    return false
+}
+
+function polygonsOverlap(polygona,polygonb){
+    //TODO
+}
+
 function findResultElementAt(x, y) {
     if (!lastResult) return null;
     const nodeById = new Map(lastResult.nodes.map(n => [n.id, n]));
