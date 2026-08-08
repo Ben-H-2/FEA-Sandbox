@@ -17,10 +17,18 @@ const GRID_SPACING = 20;
 const NODE_SNAP_RADIUS = 10;
 const EDGE_SNAP_RADIUS = 8;
 const GRID_SNAP_RADIUS = 10;
-const GRID_COLOR = "rgba(0,0,0,0.08)";
-const SNAP_MARKER_COLOR = "#1cb7bd";
-const REGION_COLOR = "#2563eb";
-const HOLE_COLOR = "#dc2626";
+const GRID_COLOUR = "rgba(0,0,0,0.08)";
+const NODE_DEFAULT_COLOUR = "#3b9dd9";
+const NODE_FIXED_COLOUR = "#16a34a";
+const NODE_FORCE_COLOUR = "#f59e0b";
+const NODE_SELECTED_RING = "#1a1c1f";
+const NODE_SELECTED_RING_SIZE = 1.5;
+const EDGE_DEFAULT_COLOUR = "#374151";
+const EDGE_FIXED_COLOUR = "#16a34a";
+const EDGE_FORCE_COLOUR = "#f59e0b";
+const SNAP_MARKER_COLOUR = "#44aa99";
+const REGION_COLOUR = "#7c3aed";
+const HOLE_COLOUR = "#ef4444";
 
 let nodes = []; 
 let elements = []; 
@@ -192,6 +200,7 @@ window.addEventListener("load", () => {
             elements = snapshot.elements;
             edgeRules = snapshot.edgeRules;
             nextNodeId = snapshot.nextNodeId;
+            polygonShapes = snapshot.polygonShapes || [];
             draw();
         }
     }
@@ -586,7 +595,7 @@ function drawResultMesh() {
 
     ctx.lineJoin = "round";
     if (showOutlines) {
-        ctx.strokeStyle = "black";
+        ctx.strokeStyle = EDGE_DEFAULT_COLOUR;
         ctx.lineWidth = 1;
         ctx.stroke();
     } else {
@@ -601,7 +610,7 @@ function drawResultMesh() {
         if (showOutlines) {
             ctx.beginPath();
             ctx.arc(x, y, 3, 0, Math.PI * 2);
-            ctx.fillStyle = "black";
+            ctx.fillStyle = EDGE_DEFAULT_COLOUR;
             ctx.fill();
         }
     });
@@ -629,12 +638,12 @@ function drawEditableMesh() {
         for (const [p1, p2, ea, eb] of edges) {
             const rule = getEdgeRuleForElementEdge(ea, eb);
 
-            let strokeStyle = "black";
+            let strokeStyle = EDGE_DEFAULT_COLOUR;
             if (rule) {
                 if (rule.type === "fix" && (rule.fix_x || rule.fix_y)) {
-                    strokeStyle = "green";
+                    strokeStyle = EDGE_FIXED_COLOUR;
                 } else if (rule.type === "force" && (rule.force_x !== 0 || rule.force_y !== 0)) {
-                    strokeStyle = "orange";
+                    strokeStyle = EDGE_FORCE_COLOUR;
                 }
             }
 
@@ -642,14 +651,14 @@ function drawEditableMesh() {
             ctx.moveTo(p1.x, p1.y);
             ctx.lineTo(p2.x, p2.y);
             ctx.strokeStyle = strokeStyle;
-            ctx.lineWidth = strokeStyle === "black" ? 1 : 2.5;
+            ctx.lineWidth = strokeStyle === EDGE_DEFAULT_COLOUR ? 1 : 2.5;
             ctx.stroke();
         }
     });
 
     nodes.forEach(node => {
         const isSelected = selectedNodeIds.includes(node.id);
-        const radius = isSelected ? NODE_RADIUS + 3 : NODE_RADIUS;
+        const radius = isSelected ? NODE_RADIUS + NODE_SELECTED_RING_SIZE : NODE_RADIUS;
 
         ctx.beginPath();
         ctx.arc(node.x, node.y, radius, 0, Math.PI * 2);
@@ -658,18 +667,18 @@ function drawEditableMesh() {
         const hasForce = node.force_x !== 0 || node.force_y !== 0 || effective.forceX !== 0 || effective.forceY !== 0;
 
         if (isFixed) {
-            ctx.fillStyle = "green";
+            ctx.fillStyle = NODE_FIXED_COLOUR;
         } else if (hasForce) {
-            ctx.fillStyle = "orange";
+            ctx.fillStyle = NODE_FORCE_COLOUR;
         } else {
-            ctx.fillStyle = "blue";
+            ctx.fillStyle = NODE_DEFAULT_COLOUR;
         }
         ctx.fill();
 
         if (isSelected) {
             ctx.beginPath();
-            ctx.arc(node.x, node.y, radius + 3, 0, Math.PI * 2);
-            ctx.strokeStyle = "white";
+            ctx.arc(node.x, node.y, radius + NODE_SELECTED_RING_SIZE, 0, Math.PI * 2);
+            ctx.strokeStyle = NODE_SELECTED_RING;
             ctx.lineWidth = 2;
             ctx.stroke();
         }
@@ -678,7 +687,7 @@ function drawEditableMesh() {
 
 function drawGrid() {
     if (!gridEnabled) return;
-    ctx.strokeStyle = GRID_COLOR;
+    ctx.strokeStyle = GRID_COLOUR;
     ctx.lineWidth = 1;
     for (let x = 0; x <= LOGICAL_WIDTH; x += GRID_SPACING) {
         ctx.beginPath();
@@ -695,6 +704,21 @@ function drawGrid() {
 }
 
 function drawPolygons() {
+    polygonShapes.forEach(shape => {
+        ctx.beginPath();
+        ctx.moveTo(shape.boundary[0].x, shape.boundary[0].y);
+        for (let i = 1; i < shape.boundary.length; i++) {
+            ctx.lineTo(shape.boundary[i].x, shape.boundary[i].y);
+        }
+        ctx.closePath();
+        const colour = shape.type === "region" ? REGION_COLOUR : HOLE_COLOUR;
+        ctx.fillStyle = hexToRgba(colour, 0.15);
+        ctx.fill();
+        ctx.strokeStyle = colour;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+    });
+
     if (mode !== "automesh") return;
     if (currentPolygonPoints.length > 0) {
         ctx.beginPath();
@@ -702,14 +726,14 @@ function drawPolygons() {
         for (let i = 1; i < currentPolygonPoints.length; i++) {
             ctx.lineTo(currentPolygonPoints[i].x, currentPolygonPoints[i].y);
         }
-        ctx.strokeStyle = polygonShapeType === "region" ? REGION_COLOR : HOLE_COLOR;
+        ctx.strokeStyle = polygonShapeType === "region" ? REGION_COLOUR : HOLE_COLOUR;
         ctx.lineWidth = 2;
         ctx.stroke();
 
         currentPolygonPoints.forEach(p => {
             ctx.beginPath();
             ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
-            ctx.fillStyle = polygonShapeType === "region" ? REGION_COLOR : HOLE_COLOR;
+            ctx.fillStyle = polygonShapeType === "region" ? REGION_COLOUR : HOLE_COLOUR;
             ctx.fill();
         });
     }
@@ -738,7 +762,7 @@ canvas.addEventListener("mousemove", (e) => {
     if (snapEnabled) {
         ctx.beginPath();
         ctx.arc(lastSnapPoint.x, lastSnapPoint.y, 5, 0, Math.PI * 2);
-        ctx.strokeStyle = SNAP_MARKER_COLOR;
+        ctx.strokeStyle = SNAP_MARKER_COLOUR;
         ctx.lineWidth = 2;
         ctx.stroke();
     }
@@ -780,9 +804,66 @@ document.getElementById("add-node-btn").onclick = () => {
     draw();
 };
 
+document.getElementById("generate-mesh-btn").onclick = async () => {
+    if (currentPolygonPoints.length > 0) {
+        alert("Finish or cancel the current polygon before generating a mesh");
+        return;
+    }
+    saveMeshSnapshot();
+    const regions = polygonShapes.filter(s => s.type === "region");
+    const holes = polygonShapes.filter(s => s.type === "hole");
+    if (regions.length === 0) {
+        alert("Draw at least one region");
+        return;
+    }
+    const payload = {
+        regions: regions.map(s => ({
+            boundary: s.boundary.map(p => [p.x, p.y]),
+            material: s.material || "steel",
+            thickness: 0.01
+        })),
+        holes: holes.map(s => ({
+            boundary: s.boundary.map(p => [p.x, p.y])
+        })),
+        min_angle: 30
+    };
+    const response = await fetch("/automesh", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+    });
+    if (!response.ok) {
+        alert("Mesh generation failed: " + (await response.text()));
+        return;
+    }
+    const result = await response.json();
+    const idMap = {};
+    result.nodes.forEach(n => {
+        const newId = nextNodeId++;
+        idMap[n.id] = newId;
+        nodes.push({
+            id: newId, x: n.posx, y: n.posy,
+            force_x: 0, force_y: 0,
+            is_fixed_x: false, is_fixed_y: false
+        });
+    });
+    result.elements.forEach(el => {
+        elements.push({
+            type: "triangle",
+            node_ids: el.node_ids.map(id => idMap[id]),
+            material: el.material,
+            thickness: el.thickness
+        });
+    });
+
+    polygonShapes = [];
+    draw();
+};
+
 canvas.addEventListener("click", (e) => {
     const raw = { x: e.offsetX / scale, y: e.offsetY / scale };
     const snap = getSnapPoint(raw.x, raw.y);
+    console.log("canvas click fired", mode);
 
     if (mode === "node") {
         showStress = false;
@@ -831,6 +912,8 @@ canvas.addEventListener("click", (e) => {
         }
     } else if (mode === "automesh") {
 
+        console.log("automesh click", raw, snap, currentPolygonPoints.length);
+
         if (currentPolygonPoints.length >= 3) {
             const first = currentPolygonPoints[0];
             const dx = snap.x - first.x;
@@ -844,6 +927,7 @@ canvas.addEventListener("click", (e) => {
                     material: currentMaterial
                 });
                 currentPolygonPoints = [];
+                draw()
                 return;
             }
         }
@@ -1011,7 +1095,7 @@ document.getElementById("node-panel-delete").onclick = async () => {
 };
 
 document.getElementById("clear-mesh-btn").onclick = () => {
-    if (nodes.length === 0 && elements.length === 0) return;
+    if (nodes.length === 0 && elements.length === 0 && polygonShapes.length === 0 && currentPolygonPoints.length === 0) return;
     const confirmed = confirm("Clear the entire mesh? This cannot be undone.");
     if (!confirmed) return;
 
@@ -1025,6 +1109,8 @@ document.getElementById("clear-mesh-btn").onclick = () => {
     showDeformed = false;
     editingNode = null;
     editingEdge = null;
+    polygonShapes = [];
+    currentPolygonPoints = [];
 
     syncToggleButton("toggle-stress-btn", showStress);
     syncToggleButton("toggle-deformed-btn", showDeformed);
@@ -1062,7 +1148,7 @@ function recordSolveTime(elementCount, ms) {
 }
 function saveMeshSnapshot() {
     try {
-        localStorage.setItem("meshSnapshot", JSON.stringify({ nodes, elements, edgeRules, nextNodeId }));
+        localStorage.setItem("meshSnapshot", JSON.stringify({ nodes, elements, edgeRules, nextNodeId,polygonShapes}));
     } catch (e) {
         console.warn("Could not save mesh snapshot:", e);
     }
