@@ -443,6 +443,7 @@ function segmentsIntersect(A,B,C,D){
     const crossprodCDCB = (CD.x*CB.y)-(CB.x*CD.y);
 
     if ((Math.sign(crossprodABAC) !== Math.sign(crossprodABAD)) && (Math.sign(crossprodCDCA) !== Math.sign(crossprodCDCB))){
+        
         // TODO: currently blocks T-junction/hanging-node cases (vertex touching
         // another element's edge without matching a vertex) same as real overlap.
         // Once splitElement() function exists, handle by auto-splitting the
@@ -914,7 +915,6 @@ document.getElementById("generate-mesh-btn").onclick = async () => {
         alert("Finish or cancel the current polygon before generating a mesh");
         return;
     }
-    saveMeshSnapshot();
     const regions = polygonShapes.filter(s => s.type === "region");
     const holes = polygonShapes.filter(s => s.type === "hole");
     if (regions.length === 0) {
@@ -962,6 +962,7 @@ document.getElementById("generate-mesh-btn").onclick = async () => {
     });
 
     polygonShapes = [];
+    saveMeshSnapshot()
     draw();
 };
 
@@ -987,14 +988,35 @@ canvas.addEventListener("click", (e) => {
 
         if (selectedNodeIds.includes(node.id)) {
             selectedNodeIds = selectedNodeIds.filter(id => id !== node.id);
-        } else {
+    } else {
             selectedNodeIds.push(node.id);
+    }
+
+    if (selectedNodeIds.length === 3) {
+        const newPoints = selectedNodeIds.map(id => {
+            const n = nodes.find(n => n.id === id);
+            return { x: n.x, y: n.y };
+        });
+
+        const overlapsExisting = elements.some(el => {
+            const existingPoints = el.node_ids.map(id => {
+                const n = nodes.find(n => n.id === id);
+                return { x: n.x, y: n.y };
+            });
+            return polygonsOverlap(newPoints, existingPoints);
+        });
+
+        if (overlapsExisting) {
+            alert("Can't place element: overlaps an existing element.");
+            selectedNodeIds = [];
+            draw()
+            return;
         }
 
-        if (selectedNodeIds.length === 3) {
-            elements.push({ type: "triangle", node_ids: [...selectedNodeIds], material: currentMaterial });
-            selectedNodeIds = [];
-        }
+        elements.push({ type: "triangle", node_ids: [...selectedNodeIds], material: currentMaterial });
+        selectedNodeIds = [];
+    }
+
     } else if (mode == "rectangle") {
         showStress = false;
         const node = snap.node || findNodeNear(snap.x, snap.y);
@@ -1026,6 +1048,15 @@ canvas.addEventListener("click", (e) => {
             const dist = Math.sqrt(dx * dx + dy * dy);
 
             if (dist <= NODE_SNAP_RADIUS) {
+                const overlapsExisting = polygonShapes.some(shape =>
+                polygonsOverlap(currentPolygonPoints, shape.boundary)
+            );
+
+                if (overlapsExisting) {
+                    alert("Can't place shape: overlaps an existing region/hole.");
+                    return;
+                }
+
                 polygonShapes.push({
                     type: polygonShapeType,
                     boundary: [...currentPolygonPoints],
@@ -1035,6 +1066,7 @@ canvas.addEventListener("click", (e) => {
                 draw()
                 return;
             }
+
         }
 
         currentPolygonPoints.push({ x: snap.x, y: snap.y });
