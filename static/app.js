@@ -78,7 +78,9 @@ function updateModeButtons() {
 function setMode(newMode) { 
     selectedNodeIds = []
     mode = newMode;
-    console.log(mode)
+    if (mode == "automesh"){
+        currentPolygonPoints = []
+    }
     draw()
     updateModeButtons();
 }
@@ -456,7 +458,30 @@ function segmentsIntersect(A,B,C,D){
     }
 }
 
-function polygonsOverlap(polygona,polygonb){
+function trianglesShareEdgeWithoutOverlap(triangle1, triangle2) {
+    const shared = triangle1.filter(id => triangle2.includes(id));
+
+    if (shared.length !== 2) {
+        return false;
+    }
+    const third1 = triangle1.find(id => !shared.includes(id));
+    const third2 = triangle2.find(id => !shared.includes(id));
+
+    const a = nodes.find(n => n.id === shared[0]);
+    const b = nodes.find(n => n.id === shared[1]);
+    const p = nodes.find(n => n.id === third1);
+    const q = nodes.find(n => n.id === third2);
+
+    const side1 =
+        (b.x - a.x) * (p.y - a.y) -
+        (b.y - a.y) * (p.x - a.x);
+    const side2 =
+        (b.x - a.x) * (q.y - a.y) -
+        (b.y - a.y) * (q.x - a.x);
+    return side1 * side2 < 0;
+}
+
+function polygonsOverlap(polygona,polygonb,onlyedges = false){
     if (boxesOverlap(polygona,polygonb) == false){
         return false
     }
@@ -468,6 +493,10 @@ function polygonsOverlap(polygona,polygonb){
             }
         }
     }
+    if (Onlyedges == true) {
+        return false;
+    }
+
     const aTouchesB = polygonb.some(v => pointsCoincide(polygona[0], v));
     const bTouchesA = polygona.some(v => pointsCoincide(polygonb[0], v));
 
@@ -997,14 +1026,23 @@ canvas.addEventListener("click", (e) => {
             const n = nodes.find(n => n.id === id);
             return { x: n.x, y: n.y };
         });
+    const overlapsExisting = elements.some(el => {
 
-        const overlapsExisting = elements.some(el => {
-            const existingPoints = el.node_ids.map(id => {
-                const n = nodes.find(n => n.id === id);
-                return { x: n.x, y: n.y };
-            });
-            return polygonsOverlap(newPoints, existingPoints);
+        const sharedCount = el.node_ids.filter(id =>
+            selectedNodeIds.includes(id)
+        ).length;
+
+        if (sharedCount === 2) {
+            return !trianglesShareEdgeWithoutOverlap(selectedNodeIds, el.node_ids);
+        }
+
+        const existingPoints = el.node_ids.map(id => {
+            const n = nodes.find(n => n.id === id);
+            return { x: n.x, y: n.y };
         });
+
+        return polygonsOverlap(newPoints, existingPoints);
+    });
 
         if (overlapsExisting) {
             alert("Can't place element: overlaps an existing element.");
@@ -1048,14 +1086,25 @@ canvas.addEventListener("click", (e) => {
             const dist = Math.sqrt(dx * dx + dy * dy);
 
             if (dist <= NODE_SNAP_RADIUS) {
-                const overlapsExisting = polygonShapes.some(shape =>
-                polygonsOverlap(currentPolygonPoints, shape.boundary)
+                let overlapsExisting = polygonShapes.some(shape =>
+                polygonsOverlap(currentPolygonPoints, shape.boundary, polygonShapeType == "hole")
             );
 
-                if (overlapsExisting) {
-                    alert("Can't place shape: overlaps an existing region/hole.");
-                    return;
-                }
+            if (!overlapsExisting) {
+                overlapsExisting = elements.some(el => {
+                    const existingPoints = el.node_ids.map(id => {
+                        const n = nodes.find(n => n.id === id);
+                        return { x: n.x, y: n.y };
+                    });
+
+                    return polygonsOverlap(currentPolygonPoints, existingPoints);
+                });
+            }
+
+            if (overlapsExisting) {
+                alert("Can't place shape: overlaps an existing region/hole or mesh.");
+                return;
+            }
 
                 polygonShapes.push({
                     type: polygonShapeType,
@@ -1616,4 +1665,4 @@ if (deformMaxInput) {
 }
 updateScaleFill();
 
-draw();
+draw()
