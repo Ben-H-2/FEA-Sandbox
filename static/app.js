@@ -493,7 +493,7 @@ function polygonsOverlap(polygona,polygonb,onlyedges = false){
             }
         }
     }
-    if (Onlyedges == true) {
+    if (onlyedges == true) {
         return false;
     }
 
