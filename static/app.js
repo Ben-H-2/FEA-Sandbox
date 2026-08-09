@@ -421,8 +421,8 @@ function findBoundingBox(polygon){
     return {min_x,max_x,min_y,max_y};
 }
 
-function boxesOverlap(boxA, boxB){
-    const boxAbounds = findBoundingBox(boxA);
+function boxesOverlap(boxA, boxB, BoundsA = null){
+    const boxAbounds = BoundsA || findBoundingBox(boxA);
     const boxBbounds = findBoundingBox(boxB);
     if ((boxAbounds.min_x<boxBbounds.max_x) && (boxAbounds.min_y<boxBbounds.max_y) && (boxBbounds.min_x<boxAbounds.max_x) && (boxBbounds.min_y<boxAbounds.max_y)){
         return true
@@ -481,8 +481,8 @@ function trianglesShareEdgeWithoutOverlap(triangle1, triangle2) {
     return side1 * side2 < 0;
 }
 
-function polygonsOverlap(polygona,polygonb,onlyedges = false){
-    if (boxesOverlap(polygona,polygonb) == false){
+function polygonsOverlap(polygona,polygonb,onlyedges = false, BoundsA = null){
+    if (boxesOverlap(polygona,polygonb, BoundsA) == false){
         return false
     }
     for (let edge = 0; edge<polygona.length; edge++){
@@ -1086,8 +1086,9 @@ canvas.addEventListener("click", (e) => {
             const dist = Math.sqrt(dx * dx + dy * dy);
 
             if (dist <= NODE_SNAP_RADIUS) {
+                const newBounds = findBoundingBox(currentPolygonPoints);
                 let overlapsExisting = polygonShapes.some(shape =>
-                polygonsOverlap(currentPolygonPoints, shape.boundary, polygonShapeType == "hole")
+                polygonsOverlap(currentPolygonPoints, shape.boundary, polygonShapeType == "hole", newBounds)
             );
 
             if (!overlapsExisting) {
@@ -1097,7 +1098,7 @@ canvas.addEventListener("click", (e) => {
                         return { x: n.x, y: n.y };
                     });
 
-                    return polygonsOverlap(currentPolygonPoints, existingPoints);
+                    return polygonsOverlap(currentPolygonPoints, existingPoints, false, newBounds);
                 });
             }
 
