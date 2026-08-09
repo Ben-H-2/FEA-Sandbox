@@ -363,6 +363,12 @@ function getEdgeRuleForElementEdge(idA, idB) {
     return edgeRules.find(r => r.node_a_id === a && r.node_b_id === b);
 }
 
+function pointsCoincide(p1, p2, epsilon = 1e-6) {
+    const dx = p1.x - p2.x;
+    const dy = p1.y - p2.y;
+    return Math.sqrt(dx * dx + dy * dy) <= epsilon;
+}
+
 function pointInTriangle(px, py, ax, ay, bx, by, cx, cy) {
     const d1 = (px - bx) * (ay - by) - (ax - bx) * (py - by);
     const d2 = (px - cx) * (by - cy) - (bx - cx) * (py - cy);
@@ -422,8 +428,55 @@ function boxesOverlap(boxA, boxB){
     return false
 }
 
+function segmentsIntersect(A,B,C,D){
+    const AB = {x: (A.x-B.x),y: (A.y-B.y)};
+    const CD = {x: (C.x-D.x),y: (C.y-D.y)};
+    const AC = {x: (A.x-C.x),y: (A.y-C.y)};
+    const AD = {x: (A.x-D.x),y: (A.y-D.y)};
+    const CA = {x: (C.x-A.x),y: (C.y-A.y)};
+    const CB = {x: (C.x-B.x),y: (C.y-B.y)};
+
+    const crossprodABAC = (AB.x*AC.y)-(AC.x*AB.y);
+    const crossprodABAD = (AB.x*AD.y)-(AD.x*AB.y);
+
+    const crossprodCDCA = (CD.x*CA.y)-(CA.x*CD.y);
+    const crossprodCDCB = (CD.x*CB.y)-(CB.x*CD.y);
+
+    if ((Math.sign(crossprodABAC) !== Math.sign(crossprodABAD)) && (Math.sign(crossprodCDCA) !== Math.sign(crossprodCDCB))){
+        // TODO: currently blocks T-junction/hanging-node cases (vertex touching
+        // another element's edge without matching a vertex) same as real overlap.
+        // Once splitElement() function exists, handle by auto-splitting the
+        // element instead of blocking placement outright.
+
+        return true
+    }
+    else{
+        return false
+    }
+}
+
 function polygonsOverlap(polygona,polygonb){
-    //TODO
+    if (boxesOverlap(polygona,polygonb) == false){
+        return false
+    }
+    for (let edge = 0; edge<polygona.length; edge++){
+        for (let edge2 = 0; edge2<polygonb.length; edge2++){
+            let intersect = segmentsIntersect(polygona[edge],polygona[(edge+1)%polygona.length],polygonb[edge2],polygonb[(edge2+1)%polygonb.length])
+            if (intersect == true){
+                return true
+            }
+        }
+    }
+    const aTouchesB = polygonb.some(v => pointsCoincide(polygona[0], v));
+    const bTouchesA = polygona.some(v => pointsCoincide(polygonb[0], v));
+
+    if (!aTouchesB && pointInPolygon(polygona[0].x, polygona[0].y, polygonb)) {
+        return true;
+    }
+    if (!bTouchesA && pointInPolygon(polygonb[0].x, polygonb[0].y, polygona)) {
+        return true;
+    }
+    return false;
 }
 
 function findResultElementAt(x, y) {
