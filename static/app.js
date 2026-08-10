@@ -387,7 +387,7 @@ function pointInPolygon(px, py, polygon) {
     for (let i = 0; i < polygon.length; i++){
         const currentCoord = polygon[i];
         const nextCoord = polygon[(i+1)%polygon.length];
-        if (!((py>currentCoord.y && py>nextCoord.y) || (py<currentCoord.y && py<nextCoord.y))){
+        if ((currentCoord.y > py) !== (nextCoord.y > py)){
             const t = (py - currentCoord.y) / (nextCoord.y - currentCoord.y);
             const x_crossing = currentCoord.x + t * (nextCoord.x - currentCoord.x);
             if (x_crossing > px){
@@ -431,6 +431,11 @@ function boxesOverlap(boxA, boxB, BoundsA = null){
 }
 
 function segmentsIntersect(A,B,C,D){
+
+    if (pointsCoincide(A,C) || pointsCoincide(A,D) || pointsCoincide(B,C) || pointsCoincide(B,D)){
+        return false
+    }
+
     const AB = {x: (A.x-B.x),y: (A.y-B.y)};
     const CD = {x: (C.x-D.x),y: (C.y-D.y)};
     const AC = {x: (A.x-C.x),y: (A.y-C.y)};
@@ -478,7 +483,7 @@ function trianglesShareEdgeWithoutOverlap(triangle1, triangle2) {
     const side2 =
         (b.x - a.x) * (q.y - a.y) -
         (b.y - a.y) * (q.x - a.x);
-    return side1 * side2 < 0;
+    return Math.sign(side1) !== Math.sign(side2);
 }
 
 function polygonsOverlap(polygona,polygonb,onlyedges = false, BoundsA = null){
@@ -1033,7 +1038,9 @@ canvas.addEventListener("click", (e) => {
         ).length;
 
         if (sharedCount === 2) {
-            return !trianglesShareEdgeWithoutOverlap(selectedNodeIds, el.node_ids);
+            const blocked = !trianglesShareEdgeWithoutOverlap(selectedNodeIds, el.node_ids);
+            if (blocked) console.log("BLOCKED (shared-edge)", "candidate", selectedNodeIds, "vs", el.node_ids);
+            return blocked;
         }
 
         const existingPoints = el.node_ids.map(id => {
@@ -1041,8 +1048,11 @@ canvas.addEventListener("click", (e) => {
             return { x: n.x, y: n.y };
         });
 
-        return polygonsOverlap(newPoints, existingPoints);
+        const blocked = polygonsOverlap(newPoints, existingPoints);
+        if (blocked) console.log("BLOCKED (polygonsOverlap)", "sharedCount", sharedCount, "candidate", newPoints, "vs", el.node_ids, existingPoints);
+        return blocked;
     });
+
 
         if (overlapsExisting) {
             alert("Can't place element: overlaps an existing element.");
