@@ -23,6 +23,14 @@ Right click a node or element edge to either fix it in the X/Y direction, apply 
 </details>
 <details>
 
+<summary><strong>Materials</strong></summary>
+
+<br>
+Choose from six built-in materials (steel, aluminium, copper, titanium, concrete, timber) from the toolbar dropdown, each has its own stiffness, Poisson's ratio and colour in the editable mesh. New elements and automesh regions take on the currently selected material, and the material of anexisting element can be altered by right-clicking it and picking a different material from its own panel
+
+</details>
+<details>
+
 <summary><strong>Mesh Refinement</strong></summary>
 
 <br>
@@ -65,7 +73,7 @@ Stress is conveyed through a colour-mapped overlay with a live legend, with a to
 <summary><strong>Deformed Shape Preview</strong></summary>
 
 <br>
-Toggle between the orginal and deformed mesh, with a configurable slider to exaggerate the deformation where it may not be visible for smaller forces.
+Toggle between the orginal and deformed mesh, with a configurable slider to exaggerate the deformation where it may not be visible for smaller forces. The slider’s upper and lower bounds are configurable via the boxes at either end (defaults to 0-1000).
 
 </details>
 <details>
@@ -73,7 +81,7 @@ Toggle between the orginal and deformed mesh, with a configurable slider to exag
 <summary><strong>Structural warnings</strong></summary>
 
 <br>
-Before solving a check is run for unconstrained structures or connections around single nodes (articulation points) in order to prevent unintended results (these warnings are permanently dismissable).
+Before solving a check is run for lack of fixed nods or edges, no applied loads, unconstrained structures or connections around single nodes (articulation points) in order to prevent unintended results (the last 2 warnings are dismissable however warnings against calculating without forces or fixed points are not).
 
 </details>
 <details>
@@ -86,7 +94,7 @@ Upon solving, reloading or exiting the page the current mesh is snapshotted to l
 </details>
 
 
-## Screenshots (outdated since v1.4)
+## Screenshots (outdated since v1.4 new ui is much better)
 ### Outlines toggled on:
 ![](Example_Photos/v1.4_lines.png)
 ### Editor Mode
@@ -107,7 +115,7 @@ pip
 ### Installation
 ```
 git clone https://github.com/Ben-H-2/FEA-Sandbox.git
-cd 2D-FEA-Sandbox
+cd FEA-Sandbox
 pip install -r requirements.txt
 ```
 ### Running 
@@ -116,12 +124,20 @@ python main.py
 ```
 This will print out the current status of the http://localhost:8000 in the terminal as well as a link to the interactive browser window.
 
+### Running tests
+```
+pytest
+```
+Covers the solver and mode/element assembly but not anything else as of v1.6
 ## Usage
 | Action | How |
 |---|---|
 | Place a node | Select "Place Node" mode then left click canvas, or enter X/Y and click "Add Node" |
+| Delete a node || Right click the node and press “delete” |
 | Create a triangle | Select "Make Triangle" mode then left click 3 existing nodes in sequence |
 | Create a rectangle | Select "Make Rectangle" mode → click 2 nodes as opposite corners |
+| Set material for new elements |  Choose from the “materials” dropdown at the top and every element created will be that material |
+| Change an elements material | Right click the element, pick the material and “apply” |
 | Create automesh region | Toggle automesh mode to “region” draw outline of polygon and connect back to the start|
 | Create automesh hole | Toggle automesh mode to “hole” draw outline of polygon within existing automesh region |
 | Convert automesh regions to elements| Press “generate automesh” button, it will generate elements and nodes |
@@ -132,12 +148,15 @@ This will print out the current status of the http://localhost:8000 in the termi
 | Read stress values | Toggle "Scale: Linear/Log", hover over solved mesh to read the stress at that point |
 | View element borders | Toggle the "Toggle Outlines" button |
 | Preview deformation | "Toggle Deformation" + deformation scale slider |
+| Adjust deformation slider bounds | Edit the min/max fields either side of the deformation slider |
  
 ### Notes:
 - **Interpreting the legend:** the color bar maps color to von Mises stress (Pa). Using the log mode can reveal discrepancies in stress more clearly where in linear mode, high stress points may dominate the colouring.
 - **Calculation warnings:** if the mesh looks structurally unstable or the refinement level is high, you'll be prompted to confirm before the solve proceeds.
 - **Hovering for point stress:** while viewing solved results, hover over any element to see its exact von Mises stress value in a tooltip.
 - **Overlap warnings** if an element currently being created overlaps another it will flag it as overlap and prevent creation
+- **Pre-solve checks** calculate will not run if there are not any loads or fixed edges/nodes
+- **Solve time estimate** after solving a few meshes the solving indicator will show an estimate based on your own solve history
 
 ## How It Works
 <details>
@@ -154,6 +173,21 @@ This will print out the current status of the http://localhost:8000 in the termi
 <br>- <em>Each refinement pass subdivides each triangle element into 4 new triangles</em>
 <br> - <em>Therefore triangle/element count grows at a rate of n * 4^refine_times where n is intital element count</em>
 <br> - <em>This explains why refinement above 5 is flagged by red colouring and refinement above 5 for meshes with multiple elements is inadvisable</em>
+
+</details>
+<details>
+
+<summary><strong>Materials</strong></summary>
+<br>- <em>The frontend loads material definitions (name, Young's modulus E, Poisson's ratio ν, colour) from <code>GET /materials</code>, backed by <code>fea/material.py</code>'s <code>DEFAULT_MATERIALS</code></em>
+<br>- <em>Every element and *calculated automesh region carries a material which corresponds to a element tint colour</em>
+
+</details>
+<details>
+
+<summary><strong>Automesh / Region Meshing</strong></summary>
+<br>- <em>Drawn regions and holes are sent to <code>POST /automesh</code>, which gives polygon boundaries to the <code>triangle</code> library for constrained Delaunay triangulation</em>
+<br>- <em>A minimum-angle (currently at 30°) keeps generated triangles roughly equilateral rather than skinny</em>
+<br>- <em>Each region's material and thickness are tagged onto its interior point so the resulting triangles inherit the right material automatically but holes are excluded via their own interior point</em>
 
 </details>
 <details>
@@ -187,37 +221,43 @@ This will print out the current status of the http://localhost:8000 in the termi
 
 </details>
 
-
-## Known Limitations
-- No material property support yet (assumes steel)
-- No persistent save/load to file 
-
-## Roadmap
+## Future features
 - [x] Automesh
 - [x] Material properties
+- [ ] Undo/Redo buttons
+- [ ] Truss/line elements in the browser
+- [ ] Load cases
+- [ ] Export results
+- [ ] Better editing tools (mirror align etc)
 - [ ] Save/load mesh to file
-- [ ] Pyvista implementation
+- [ ] Expose configuration constants in the ui as a menu
+- [ ] Pyvista implementation as an option
 - [ ] Curved lines support
 - [ ] Automatic element splitting on node placement
+- [ ] Use caching to improve solve times
+- [ ] Partial canvas redraws instead of entire redraws
 
 ## Project Structure
 ### File Layout
 ```
 .
-├── api/app.py              # FastAPI app, /calculate endpoint
+├── .devcontainer/
+│   └── devcontainer.json    # GitHub Codespaces environment(desktoplite+ port 6080)
+├── api/app.py                # FastAPI app: /, /health, /materials, /automesh, /calculate
 ├── fea/
-│   ├── model.py             # AnalysisModel: nodes, elements, materials
-│   ├── element.py           # Element / TriangleElement definitions
-│   ├── node.py               # Node definition
-│   ├── material.py           # Material dataclass + defaults
-│   ├── mesh.py                # Refinement, edge rule application
-│   ├── solver.py               # Sparse stiffness matrix assembly & solve
-│   ├── visualisation.py         # Backend-side rendering helpers
-│   └—- automesh.py           # Region/Hole polygon
+│   ├── model.py                # AnalysisModel: nodes, elements, materials, solve orchestration
+│   ├── element.py               # ElementBase / Element (truss) / TriangleElement
+│   ├── node.py                    # Node definition
+│   ├── material.py                 # Material dataclass + DEFAULT_MATERIALS
+│   ├── mesh.py                      # Refinement, edge rule application
+│   ├── solver.py                     # Sparse stiffness matrix assembly & solve
+│   ├── visualisation.py               # PyVista-based plotting helpers (scripting use)
+│   └── automesh.py                     # Region/hole polygon generation
 ├── static/
-│   ├── index.html             # Frontend UI
-│   └── app.js                  # Mesh editor, canvas rendering, solve calls
-├── main.py                      # Local/Codespaces entry point
+│   ├── index.html                       # Frontend UI
+│   └── app.js                            # Mesh editor, canvas rendering, solve calls
+├── Example_Photos/                         # Screenshots used in this README
+├── main.py                                  # Local/Codespaces entry point
 ├── test_solver.py
 ├── test_model.py
 └── requirements.txt
@@ -233,10 +273,18 @@ This will print out the current status of the http://localhost:8000 in the termi
 | `NODE_SELECTION_RADIUS` | `app.js` | Configures the range around a node where it can be selected |
 | `ELEMENT_SELECTION_RADIUS` | `app.js` | Configures the range around an element where it can be selected |
 | `NODE_RADIUS` | `app.js` | Configures the size of nodes in the editable mesh |
+| `MATERIAL_FILL_ALPHA` | `app.js` | Opacity of tinted elements by their material colour in the editable mesh view |
+| `GRID_SPACING` | `app.js` | Spacing between grid lines when the grid is toggled on |
+| `NODE_SNAP_RADIUS` | `app.js` | Snap priority 1: distance within which clicks snap to an existing node |
+| `EDGE_SNAP_RADIUS` | `app.js` | Snap priority 2: distance within which clicks snap to an existing edge |
+| `GRID_SNAP_RADIUS` | `app.js` | Snap priority 3: distance within which clicks snap to a grid intersection |
+| `default_thickness` | `fea/automesh.py` | Thickness applied to a region that doesn't specify its own |
+| `coord_precision` | `fea/automesh.py` | Decimal places used to de-duplicate shared boundary vertices between regions/holes |
 
 ## Credits
 
 Toolbar icons by [Lucide](https://lucide.dev) — ISC License.
+Region/hole meshing powered by the [`triangle`](https://pypi.org/project/triangle/) Python bindings to Jonathan Shewchuk's Triangle library.
 
 ## Contributing
 
