@@ -1,5 +1,6 @@
 # FEA Sandbox - Interactive Finite Element Analysis Tool
-## outdated by a few versions
+
+## (readme is still partially outdated)
 
 **A browser-based tool for building 2D meshes and applying loads and constraints, all in real time with stress colouring, deformation and structural warning feedback. No external software required, running locally or in Github codespaces.**
 
@@ -26,6 +27,21 @@ Right click a node or element edge to either fix it in the X/Y direction, apply 
 
 <br>
 Subdivide the mesh before solving with a configurable level of refinement up to 4^8 triangles per element. Warning messages are shown above a certain threshold as refinement grows element count exponentially so can lead to long processing time.
+
+</details>
+<details>
+
+<summary><strong>Grid & Snap</strong></summary>
+
+<br>
+Toggleable grid overlay for reference as well as toggleable snap mode prioritising existing nodes, then edges then the grid if enabled, making placement easier.
+</details>
+<details>
+
+<summary><strong>Region Drawing / Automesh</strong></summary>
+
+<br>
+Draw material regions (and holes) as polygons, then auto-triangulate the interior through constrained Delaunay meshing.
 
 </details>
 <details>
@@ -70,7 +86,7 @@ Upon solving, reloading or exiting the page the current mesh is snapshotted to l
 </details>
 
 
-## Screenshots
+## Screenshots (outdated since v1.4)
 ### Outlines toggled on:
 ![](Example_Photos/v1.4_lines.png)
 ### Editor Mode
@@ -106,8 +122,10 @@ This will print out the current status of the http://localhost:8000 in the termi
 | Place a node | Select "Place Node" mode then left click canvas, or enter X/Y and click "Add Node" |
 | Create a triangle | Select "Make Triangle" mode then left click 3 existing nodes in sequence |
 | Create a rectangle | Select "Make Rectangle" mode → click 2 nodes as opposite corners |
-| Fix a node | Right-click node and check Fix X / Fix Y |
-| Apply a force | Right-click node and enter Force X / Force Y |
+| Create automesh region | Toggle automesh mode to “region” draw outline of polygon and connect back to the start|
+| Create automesh hole | Toggle automesh mode to “hole” draw outline of polygon within existing automesh region |
+| Convert automesh regions to elements| Press “generate automesh” button, it will generate elements and nodes |
+| Fix/load a node | Right-click node and check Fix X / Fix Y to fix and type in force in x and y direction |
 | Fix/load a whole edge | Right-click an element edge (not a node) and fix/apply force same as nodes|
 | Refine the mesh | Set "Refine" value before calculating, ranges from 1-8 |
 | Run a solve | Click "Calculate" |
@@ -119,6 +137,7 @@ This will print out the current status of the http://localhost:8000 in the termi
 - **Interpreting the legend:** the color bar maps color to von Mises stress (Pa). Using the log mode can reveal discrepancies in stress more clearly where in linear mode, high stress points may dominate the colouring.
 - **Calculation warnings:** if the mesh looks structurally unstable or the refinement level is high, you'll be prompted to confirm before the solve proceeds.
 - **Hovering for point stress:** while viewing solved results, hover over any element to see its exact von Mises stress value in a tooltip.
+- **Overlap warnings** if an element currently being created overlaps another it will flag it as overlap and prevent creation
 
 ## How It Works
 <details>
@@ -142,6 +161,7 @@ This will print out the current status of the http://localhost:8000 in the termi
 <summary><strong>Structural Warnings</strong></summary>
 <br> - <em>Unconstrained Element Check - If there are no fixed nodes or elements deformation would result in the whole mesh moving (effectively dissapearing)</em>
 <br> - <em>Articulation Point Detection - If a single node connects 2 otheriwse disconnected regions it can result in innacurate deformation results so this is flagged</em>
+<br> - <em>Overlap Detection - If a currently created element overlaps another an alert will fire and the element will not be created</em>
 
 </details>
 <details>
@@ -173,10 +193,12 @@ This will print out the current status of the http://localhost:8000 in the termi
 - No persistent save/load to file 
 
 ## Roadmap
-- [ ] Material properties
+- [x] Automesh
+- [x] Material properties
 - [ ] Save/load mesh to file
 - [ ] Pyvista implementation
 - [ ] Curved lines support
+- [ ] Automatic element splitting on node placement
 
 ## Project Structure
 ### File Layout
@@ -190,7 +212,8 @@ This will print out the current status of the http://localhost:8000 in the termi
 │   ├── material.py           # Material dataclass + defaults
 │   ├── mesh.py                # Refinement, edge rule application
 │   ├── solver.py               # Sparse stiffness matrix assembly & solve
-│   └── visualisation.py         # Backend-side rendering helpers
+│   ├── visualisation.py         # Backend-side rendering helpers
+│   └—- automesh.py           # Region/Hole polygon
 ├── static/
 │   ├── index.html             # Frontend UI
 │   └── app.js                  # Mesh editor, canvas rendering, solve calls
@@ -198,124 +221,6 @@ This will print out the current status of the http://localhost:8000 in the termi
 ├── test_solver.py
 ├── test_model.py
 └── requirements.txt
-```
-
-### Module Dependency Graph
-```mermaid
-graph TD
-subgraph EntryGroup["Entry Point"]
-Main["main.py"]
-end
-subgraph BackendGroup["Backend API"]
-    App["api/app.py<br/>/calculate endpoint"]
-end
-
-subgraph CoreGroup["fea/ — FEA Core"]
-    Model["model.py<br/>AnalysisModel"]
-    Mesh["mesh.py<br/>refine_mesh, apply_edge_rules"]
-    Element["element.py<br/>Element, TriangleElement"]
-    Node["node.py<br/>Node"]
-    Material["material.py<br/>Material"]
-    Solver["solver.py<br/>matrix assembly + solve"]
-    Vis["visualisation.py<br/>show_mesh, render_model"]
-end
-
-subgraph FrontendGroup["static/ — Frontend"]
-    HTML["index.html"]
-    JS["app.js"]
-end
-
-subgraph TestsGroup["Tests"]
-    Tests["test_model.py<br/>test_solver.py"]
-end
-
-Main --> App
-
-App --> Model
-App --> Mesh
-App --> Element
-
-Mesh --> Model
-Mesh -->|"TriangleElement<br/>(Element imported, unused)"| Element
-
-Model --> Node
-Model -->|"ElementBase only<br/>(Element, TriangleElement imported, unused)"| Element
-Model --> Material
-Model --> Solver
-Model -->|"show_mesh, render_model<br/>(render_mesh imported, unused)"| Vis
-
-Element --> Node
-Element --> Material
-Element --> Solver
-
-Vis --> Node
-Vis --> Element
-Vis --> Material
-Vis --> Solver
-
-App -.->|"GET / — serves"| HTML
-HTML -.->|"browser loads"| JS
-
-JS ==>|"POST /calculate"| App
-App ==>|"JSON: nodes, displacements, von_mises"| JS
-
-Tests -.-> Model
-Tests -.-> Solver
-Tests -.-> Node
-Tests -.-> Element
-Tests -.-> Material
-```
-```
- Solid → = real Python import, actively used
- Dashed -.→ = file served / loaded by the browser, not a Python import
- Thick ⇒ = live HTTP request/response between browser and server
- Dotted Tests -.→ = imported only by test files, not part of the production runtime path
-```
-### Calculation Sequence 
-```mermaid
-sequenceDiagram
-participant JS as app.js (Browser)
-participant API as api/app.py
-participant Model as AnalysisModel
-participant MeshMod as mesh.py
-participant Solver as solver.py
-participant Elem as TriangleElement
-JS->>JS: checkStructuralWarnings() — client-side check
-JS->>JS: saveMeshSnapshot() — localStorage
-JS->>API: POST /calculate {nodes, elements, edge_rules, refine_times}
-
-API->>Model: AnalysisModel() — loads default materials
-API->>Model: add_node() for each node
-API->>Elem: construct Element / TriangleElement per element
-API->>Model: add_element() for each
-
-API->>MeshMod: refine_mesh(model, times)
-loop each refinement pass
-    MeshMod->>Model: add_node() — new midpoint nodes
-    MeshMod->>Elem: build 4 new TriangleElements
-    MeshMod->>Model: add_element() x4, remove_element() original
-end
-
-API->>MeshMod: apply_edge_rules(model, edge_rules)
-MeshMod->>Model: match nodes along edge, set fix/force values
-
-API->>Model: solve()
-Model->>Model: build_mesh() — validate nodes/elements exist
-Model->>Solver: build_node_index(nodes)
-Model->>Solver: create_global_matrix(nodes, elements, node_index)
-Solver->>Elem: create_stiffness_matrix() per element
-Model->>Solver: build_force_vector(nodes, node_index)
-Model->>Solver: reduce_system() — apply fixed-DOF boundary conditions
-Model->>Solver: solve_system() — scipy spsolve
-Model->>Solver: expand_displacements() — reinsert zeros at fixed DOFs
-
-API->>Model: get_von_mises_stresses()
-Model->>Elem: get_von_mises_stress(u, node_index) per element
-Elem->>Elem: get_stress() → get_strain() using B/D matrices
-
-API-->>JS: JSON {nodes, elements, displacements, von_mises}
-JS->>JS: draw() → drawResultMesh(), updateStressLegend()
-JS->>JS: recordSolveTime() — localStorage
 ```
 ## Configuration / Constants Reference
 | Constant | Location | Purpose |
