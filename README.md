@@ -92,17 +92,14 @@ Upon solving, reloading or exiting the page the current mesh is snapshotted to l
 </details>
 
 
-## Screenshots (outdated since v1.4 new ui is much better)
-### Outlines toggled on:
-![](Example_Photos/v1.4_lines.png)
-### Editor Mode
-![](Example_Photos/v1.4_editor.png)
-### Log Colouring Mode
-![](Example_Photos/v1.4_log.png)
-### Linear Colouring Mode
-![](Example_Photos/v1.4.png)
-### Example warning
-![](Example_Photos/Instability_warning.png)
+## Screenshots (some outdated)
+
+![Example photo](Example_Photos/IMG_0039.jpeg)
+![Example photo](Example_Photos/IMG_0037.jpeg)
+![Example photo](Example_Photos/IMG_0038.jpeg)
+![Log colouring](Example_Photos/v1.4_log.png)
+![Lines toggled](Example_Photos/v1.4_lines.png)
+![Warning](Example_Photos/Instability_warning.png)
 
 ## Getting Started
 ### Prerequisites
