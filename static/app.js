@@ -54,6 +54,8 @@ let polygonShapeType = "region";
 let scale = 1;
 let deformationScale = 50;
 let stressScaleMode = "linear";
+let undoStack = [];
+let redoStack = [];
 
 function updateModeButtons() {
     const nodeButton = document.getElementById("mode-node");
@@ -68,11 +70,31 @@ function updateModeButtons() {
         triangleButton.classList.toggle("active", mode === "triangle");
     }
     if (rectangleButton) {
-        rectangleButton.classList.toggle("active", mode == "rectangle")
+        rectangleButton.classList.toggle("active", mode === "rectangle")
     }
     if (automeshButton){
-        automeshButton.classList.toggle("active", mode == "automesh")
+        automeshButton.classList.toggle("active", mode === "automesh")
     }
+}
+
+function commit(command){
+    command.redo();
+    undoStack.push(command);
+    redoStack = [];
+}
+function undo(){
+    console.log("undo triggered")
+    const cmd = undoStack.pop()
+    if (!cmd) return;
+    cmd.undo();
+    redoStack.push(cmd);
+}
+function redo(){
+    console.log("redo triggered")
+    const cmd = redoStack.pop()
+    if (!cmd) return;
+    cmd.redo()
+    undoStack.push(cmd)
 }
 
 function setMode(newMode) { 
@@ -98,6 +120,9 @@ function syncShapeTypeBadge() {
         badge.textContent = polygonShapeType === "region" ? "Region" : "Hole";
     }
 }
+
+document.getElementById("undo-btn").onclick = () => undo();
+document.getElementById("redo-btn").onclick = () => redo();
 
 const gridButton = document.getElementById("toggle-grid-btn");
 const snapButton = document.getElementById("toggle-snap-btn");
@@ -1008,12 +1033,22 @@ canvas.addEventListener("click", (e) => {
     if (mode === "node") {
         showStress = false;
         if (!snap.node) {
-            nodes.push({
+            const newNode = {
                 id: nextNodeId++,
                 x: snap.x, y: snap.y,
                 force_x: 0, force_y: 0,
                 is_fixed_x: false, is_fixed_y: false
-            });
+            };
+            commit({
+                redo: () => {
+                    nodes.push(newNode);
+                    draw();
+                },
+                undo: () => {
+                    nodes = nodes.filter(n => n.id !== newNode.id);
+                    draw()
+                }
+            })
         }
     } else if (mode === "triangle") {
         showStress = false;
@@ -1061,8 +1096,19 @@ canvas.addEventListener("click", (e) => {
             return;
         }
 
-        elements.push({ type: "triangle", node_ids: [...selectedNodeIds], material: currentMaterial });
-        selectedNodeIds = [];
+        const newTriangle = { type: "triangle", node_ids: [...selectedNodeIds], material: currentMaterial };
+        commit({
+            redo: () => {
+                elements.push(newTriangle);
+                selectedNodeIds = [];
+                draw();
+                },
+            undo: () => {
+                elements = elements.filter(el => el !== newTriangle);
+                draw();
+            }
+        })
+
     }
 
     } else if (mode == "rectangle") {

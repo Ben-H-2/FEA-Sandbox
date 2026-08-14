@@ -146,7 +146,7 @@ Covers the solver and mode/element assembly but not anything else as of v1.6
 | Adjust deformation slider bounds | Edit the min/max fields either side of the deformation slider |
  
 ### Notes:
-- **Interpreting the legend:** the color bar maps color to von Mises stress (Pa). Using the log mode can reveal discrepancies in stress more clearly where in linear mode, high stress points may dominate the colouring.
+- **Interpreting the legend:** the colour bar maps colour to von Mises stress (Pa). Using the log mode can reveal discrepancies in stress more clearly where in linear mode, high stress points may dominate the colouring.
 - **Calculation warnings:** if the mesh looks structurally unstable or the refinement level is high, you'll be prompted to confirm before the solve proceeds.
 - **Hovering for point stress:** while viewing solved results, hover over any element to see its exact von Mises stress value in a tooltip.
 - **Overlap warnings** if an element currently being created overlaps another it will flag it as overlap and prevent creation
