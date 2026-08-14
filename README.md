@@ -128,7 +128,7 @@ Covers the solver and mode/element assembly but not anything else as of v1.6
 | Action | How |
 |---|---|
 | Place a node | Select "Place Node" mode then left click canvas, or enter X/Y and click "Add Node" |
-| Delete a node || Right click the node and press “delete” |
+| Delete a node | Right click the node and press “delete” |
 | Create a triangle | Select "Make Triangle" mode then left click 3 existing nodes in sequence |
 | Create a rectangle | Select "Make Rectangle" mode → click 2 nodes as opposite corners |
 | Set material for new elements |  Choose from the “materials” dropdown at the top and every element created will be that material |
