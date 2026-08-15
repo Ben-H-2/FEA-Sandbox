@@ -144,6 +144,7 @@ Covers the solver and mode/element assembly but not anything else as of v1.6
 | View element borders | Toggle the "Toggle Outlines" button |
 | Preview deformation | "Toggle Deformation" + deformation scale slider |
 | Adjust deformation slider bounds | Edit the min/max fields either side of the deformation slider |
+| Undo/redo | Press the undo (backwards arrow) and redo (forwards arrow) buttons |
  
 ### Notes:
 - **Interpreting the legend:** the colour bar maps colour to von Mises stress (Pa). Using the log mode can reveal discrepancies in stress more clearly where in linear mode, high stress points may dominate the colouring.
@@ -219,7 +220,7 @@ Covers the solver and mode/element assembly but not anything else as of v1.6
 ## Future features
 - [x] Automesh
 - [x] Material properties
-- [ ] Undo/Redo buttons
+- [ ] Undo/Redo buttons (in progress)
 - [ ] Truss/line elements in the browser
 - [ ] Load cases
 - [ ] Export results
