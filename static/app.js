@@ -56,6 +56,7 @@ let deformationScale = 50;
 let stressScaleMode = "linear";
 let undoStack = [];
 let redoStack = [];
+let isCalculating = false;
 
 function updateModeButtons() {
     const nodeButton = document.getElementById("mode-node");
@@ -1003,6 +1004,11 @@ document.getElementById("generate-mesh-btn").onclick = async () => {
     const result = await response.json();
     const idMap = {};
     result.nodes.forEach(n => {
+        const existing = nodes.find(node => pointsCoincide(node, { x: n.posx, y: n.posy }));
+        if (existing) {
+            idMap[n.id] = existing.id;
+            return;
+        }
         const newId = nextNodeId++;
         idMap[n.id] = newId;
         nodes.push({
@@ -1557,100 +1563,120 @@ document.getElementById("edge-panel-apply").onclick = () => {
     draw();
 };
 
-document.getElementById("calculate-btn").onclick = async () => {
-    if (nodes.length === 0 || elements.length === 0) {
-        lastResult = null;
-        showStress = false;
-        syncToggleButton("toggle-stress-btn", showStress);
-        draw();
-        alert("Cannot calculate -> no nodes or elements in the mesh.");
-        return;
-    }
 
-    const hasSupport = nodes.some(node => node.is_fixed_x || node.is_fixed_y);
+const calculateBtn = document.getElementById("calculate-btn");
 
-    if (!hasSupport) {
-        alert("Your model has no supports.");
-        return;
-    }
-
-    const hasLoad = nodes.some(node => node.force_x !== 0 || node.force_y !== 0);
-
-    if (!hasLoad) {
-        alert("Your model has no applied loads.");
-        return;
-    }
-
-    const structuralWarnings = checkStructuralWarnings();
-    if (structuralWarnings.length > 0 && shouldShowStabilityWarning()) {
-        const proceed = await showStabilityWarning(structuralWarnings);
-        if (!proceed) return;
-    }
-
-    const refineTimes = parseInt(document.getElementById("refine-input").value);
-
-    if (shouldShowRefineWarning(refineTimes)) {
-        const proceed = await showRefineWarning();
-        if (!proceed) return;
-    }
-    saveMeshSnapshot();
-
-    const predictedN = predictedElementCount(refineTimes);
-    const estimate = estimateSolveTime(predictedN);
-
-    const statusEl = document.getElementById("solve-status");
-    const statusText = document.getElementById("solve-status-text");
-    statusText.textContent = estimate
-        ? (estimate < 100 ? "Solving..." : `Solving... ~${(estimate / 1000).toFixed(1)}s`)
-        : "Solving...";
-    statusEl.style.display = "flex";
-
-    const startTime = performance.now();
-
+calculateBtn.onclick = async () => {
+    if (isCalculating) return;
+    isCalculating = true;
+    calculateBtn.disabled = true;
     try {
-        const usedNodeIds = new Set(elements.flatMap(el => el.node_ids));
-        const usedNodes = nodes.filter(n => usedNodeIds.has(n.id));
-
-        const payload = {
-            nodes: usedNodes.map(n => ({
-                id: n.id, posx: n.x, posy: n.y,
-                force_x: n.force_x, force_y: n.force_y,
-                is_fixed_x: n.is_fixed_x, is_fixed_y: n.is_fixed_y
-            })),
-            elements: elements.map(el => ({
-            type: el.type, node_ids: el.node_ids, material: el.material || "steel", thickness: el.thickness || 0.01 })),
-            refine_times: refineTimes,
-            edge_rules: edgeRules
-        };
-
-        const response = await fetch("/calculate", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload)
-        });
-        if (!response.ok) {
-            alert("Calculation failed: " + (await response.text()));
-            return;
-        }
-
-        const result = await response.json();
-        if (!result) {
+        if (nodes.length === 0 || elements.length === 0) {
             lastResult = null;
             showStress = false;
             syncToggleButton("toggle-stress-btn", showStress);
             draw();
+            alert("Cannot calculate -> no nodes or elements in the mesh.");
             return;
         }
 
-        lastResult = result;
-        showStress = true;
-        syncToggleButton("toggle-stress-btn", showStress);
-        draw();
+        const usedNodeIds = new Set(elements.flatMap(el => el.node_ids));
+        const usedNodes = nodes.filter(n => usedNodeIds.has(n.id));
 
-        const elapsed = performance.now() - startTime;
-        recordSolveTime(predictedN, elapsed);
+        const hasSupport = usedNodes.some(node => {
+            const effective = getEffectiveNodeState(node.id);
+            return node.is_fixed_x || node.is_fixed_y || effective.isFixedX || effective.isFixedY;
+        });
+
+        if (!hasSupport) {
+            alert("Your model has no supports.");
+            return;
+        }
+
+        const hasLoad = usedNodes.some(node => {
+            const effective = getEffectiveNodeState(node.id);
+            return node.force_x !== 0 || node.force_y !== 0 || effective.forceX !== 0 || effective.forceY !== 0;
+        });
+
+        if (!hasLoad) {
+            alert("Your model has no applied loads.");
+            return;
+        }
+
+        const structuralWarnings = checkStructuralWarnings();
+        if (structuralWarnings.length > 0 && shouldShowStabilityWarning()) {
+            const proceed = await showStabilityWarning(structuralWarnings);
+            if (!proceed) return;
+        }
+
+        const refineTimes = parseInt(document.getElementById("refine-input").value);
+
+        if (shouldShowRefineWarning(refineTimes)) {
+            const proceed = await showRefineWarning();
+            if (!proceed) return;
+        }
+        saveMeshSnapshot();
+
+        const predictedN = predictedElementCount(refineTimes);
+        const estimate = estimateSolveTime(predictedN);
+
+        const statusEl = document.getElementById("solve-status");
+        const statusText = document.getElementById("solve-status-text");
+        statusText.textContent = estimate
+            ? (estimate < 100 ? "Solving..." : `Solving... ~${(estimate / 1000).toFixed(1)}s`)
+            : "Solving...";
+        statusEl.style.display = "flex";
+
+        const startTime = performance.now();
+
+        try {
+            const usedNodeIds = new Set(elements.flatMap(el => el.node_ids));
+            const usedNodes = nodes.filter(n => usedNodeIds.has(n.id));
+
+            const payload = {
+                nodes: usedNodes.map(n => ({
+                    id: n.id, posx: n.x, posy: n.y,
+                    force_x: n.force_x, force_y: n.force_y,
+                    is_fixed_x: n.is_fixed_x, is_fixed_y: n.is_fixed_y
+                })),
+                elements: elements.map(el => ({
+                type: el.type, node_ids: el.node_ids, material: el.material || "steel", thickness: el.thickness || 0.01 })),
+                refine_times: refineTimes,
+                edge_rules: edgeRules
+            };
+
+            const response = await fetch("/calculate", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            });
+            if (!response.ok) {
+                alert("Calculation failed: " + (await response.text()));
+                return;
+            }
+
+            const result = await response.json();
+            if (!result) {
+                lastResult = null;
+                showStress = false;
+                syncToggleButton("toggle-stress-btn", showStress);
+                draw();
+                return;
+            }
+
+            lastResult = result;
+            showStress = true;
+            syncToggleButton("toggle-stress-btn", showStress);
+            draw();
+
+            const elapsed = performance.now() - startTime;
+            recordSolveTime(predictedN, elapsed);
+        } finally {
+            statusEl.style.display = "none";
+        }
     } finally {
-        statusEl.style.display = "none";
+        isCalculating = false;
+        calculateBtn.disabled = false;
     }
 };
 
